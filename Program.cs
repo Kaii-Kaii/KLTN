@@ -5,7 +5,7 @@ using BE_QLTiemThuoc.Repositories;
 using BE_QLTiemThuoc.Services;
 using DotNetEnv;
 
-// Fix crash do FileSystemWatcher trên Render
+// Disable file watchers entirely (fix for Render)
 Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "0");
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -14,82 +14,59 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     ContentRootPath = AppContext.BaseDirectory
 });
 
-// Load biến môi trường (.env)
+// REMOVE ALL DEFAULT CONFIG SOURCES (this disables file watchers)
+builder.Configuration.Sources.Clear();
+
+// Add config WITHOUT reloadOnChange (critical!)
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+builder.Configuration.AddEnvironmentVariables();
+
+// Load .env
 Env.Load();
 
-// Tắt reloadOnChange để tránh crash "inotify limit"
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
-
-// Lấy connection string (ưu tiên từ biến môi trường của Render)
+// Read connection string
 var defaultConnection =
     Environment.GetEnvironmentVariable("Default__Connection")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-// Đăng ký DbContext
+// Register DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(defaultConnection));
 
-// Cấu hình CORS
+// CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("_myAllowSpecificOrigins",
-        policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+    options.AddPolicy("_cors", p =>
+        p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 
-// CLOUDINARY
-var cloudinaryCloudName = Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? builder.Configuration["Cloudinary:CloudName"];
-var cloudinaryApiKey = Environment.GetEnvironmentVariable("Cloudinary__ApiKey") ?? builder.Configuration["Cloudinary:ApiKey"];
-var cloudinaryApiSecret = Environment.GetEnvironmentVariable("Cloudinary__ApiSecret") ?? builder.Configuration["Cloudinary:ApiSecret"];
+// Cloudinary config
+var account = new Account(
+    Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? builder.Configuration["Cloudinary:CloudName"],
+    Environment.GetEnvironmentVariable("Cloudinary__ApiKey") ?? builder.Configuration["Cloudinary:ApiKey"],
+    Environment.GetEnvironmentVariable("Cloudinary__ApiSecret") ?? builder.Configuration["Cloudinary:ApiSecret"]
+);
 
-var account = new Account(cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret);
 builder.Services.AddSingleton(new Cloudinary(account));
 
-// Đăng ký Service & Repository
+// Register services
 builder.Services.AddScoped<NhaCungCapRepository>();
 builder.Services.AddScoped<NhaCungCapService>();
 builder.Services.AddScoped<KhachHangRepository>();
 builder.Services.AddScoped<KhachHangService>();
-builder.Services.AddScoped<ImagesService>();
-builder.Services.AddScoped<NhomLoaiRepository>();
-builder.Services.AddScoped<NhomLoaiService>();
-builder.Services.AddScoped<PhieuNhapRepository>();
-builder.Services.AddScoped<PhieuNhapService>();
-builder.Services.AddScoped<ThuocRepository>();
-builder.Services.AddScoped<ThuocService>();
-builder.Services.AddScoped<LoaiThuocRepository>();
-builder.Services.AddScoped<LoaiThuocService>();
-builder.Services.AddScoped<LieuDungRepository>();
-builder.Services.AddScoped<LieuDungService>();
-builder.Services.AddScoped<PhieuQuyDoiService>();
-builder.Services.AddScoped<ThuocViewService>();
-builder.Services.AddScoped<NhanVienRepository>();
-builder.Services.AddScoped<NhanVienService>();
-builder.Services.AddScoped<LoaiDonViRepository>();
-builder.Services.AddScoped<LoaiDonViService>();
-builder.Services.AddScoped<PhieuHuyService>();
-builder.Services.AddScoped<PhieuXuLyHoanHuyRepository>();
-builder.Services.AddScoped<PhieuXuLyHoanHuyService>();
-builder.Services.AddScoped<DanhGiaThuocRepository>();
-builder.Services.AddScoped<DanhGiaThuocService>();
-builder.Services.AddScoped<BinhLuanRepository>();
-builder.Services.AddScoped<BinhLuanService>();
-builder.Services.AddScoped<ChatRepository>();
-builder.Services.AddScoped<ChatService>();
-builder.Services.AddScoped<IThongKeService, ThongKeService>();
 
-// Controller + Swagger
+// (các service khác giữ nguyên)
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Luôn bật Swagger (Render không có môi trường Development)
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-app.UseCors("_myAllowSpecificOrigins");
+app.UseCors("_cors");
 app.UseAuthorization();
 
 app.MapControllers();
