@@ -110,11 +110,8 @@ builder.Services.AddSingleton(new Cloudinary(account));
 var app = builder.Build(); // Service collection bị khóa tại đây
 
 // Swagger UI
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseCors(MyAllowSpecificOrigins);
