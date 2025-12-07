@@ -174,13 +174,29 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/HoaDon/nhanvien/{maNV}
         [HttpGet("nhanvien/{maNV}")]
-        public async Task<ActionResult<IEnumerable<HoaDon>>> GetHoaDonByNhanVien(string maNV)
+        public async Task<ActionResult<IEnumerable<object>>> GetHoaDonByNhanVien(string maNV)
         {
             try
             {
-                var hoaDons = await _ctx.HoaDons
-                    .Where(h => h.MaNV == maNV)
-                    .OrderByDescending(h => h.NgayLap)
+                var hoaDons = await (from h in _ctx.HoaDons
+                                    join kh in _ctx.KhachHangs on h.MaKH equals kh.MAKH into khGroup
+                                    from kh in khGroup.DefaultIfEmpty()
+                                    where h.MaNV == maNV
+                                    orderby h.NgayLap descending
+                                    select new
+                                    {
+                                        h.MaHD,
+                                        h.NgayLap,
+                                        h.MaKH,
+                                        TenKH = string.IsNullOrEmpty(kh.HoTen) ? h.MaKH : kh.HoTen,
+                                        h.TongTien,
+                                        h.GhiChu,
+                                        h.TrangThaiGiaoHang,
+                                        h.PhuongThucTT,
+                                        h.TrangThai,
+                                        h.TienThanhToan,
+                                        h.OrderCode
+                                    })
                     .ToListAsync();
                 return Ok(hoaDons);
             }

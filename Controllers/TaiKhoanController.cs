@@ -162,16 +162,31 @@ namespace BE_QLTiemThuoc.Controllers
             if (user.ISEMAILCONFIRMED == 0)
                 return BadRequest("Tài khoản chưa xác thực email.");
 
-            // Kiểm tra vai trò: Nếu có MaNV thì là Admin (Nhân viên)
-            bool isAdmin = !string.IsNullOrEmpty(user.MaNV);
-            bool hasCustomerInfo = false;
+            // Kiểm tra vai trò: Nếu có MaNV và ChucVu = 1 thì là Admin
+            bool isAdmin = false;
+            int chucVu = 0;
             string vaiTro = "User";
 
-            // Nếu là Admin (có MaNV) - chuyển thẳng đến trang admin, không cần tạo mã khách hàng
-            if (isAdmin)
+            if (!string.IsNullOrEmpty(user.MaNV))
             {
-                vaiTro = "Admin";
-                hasCustomerInfo = true; // Admin không cần nhập thông tin
+                // Lấy thông tin nhân viên để kiểm tra ChucVu
+                var nhanVien = await _context.Set<NhanVien>()
+                    .FirstOrDefaultAsync(nv => nv.MaNV == user.MaNV);
+                
+                if (nhanVien != null)
+                {
+                    chucVu = nhanVien.ChucVu ?? 0;
+                    isAdmin = (chucVu == 1); // Chỉ ChucVu = 1 là Admin
+                    vaiTro = isAdmin ? "Admin" : "Staff";
+                }
+            }
+
+            bool hasCustomerInfo = false;
+
+            // Nếu là Admin hoặc Staff (có MaNV) - không cần thông tin khách hàng
+            if (!string.IsNullOrEmpty(user.MaNV))
+            {
+                hasCustomerInfo = true; // Staff/Admin không cần nhập thông tin
             }
             else
             {
@@ -229,6 +244,7 @@ namespace BE_QLTiemThuoc.Controllers
                 Email = user.EMAIL,
                 MaKH = user.MaKH,
                 MaNV = user.MaNV,
+                ChucVu = chucVu,
                 VaiTro = vaiTro,
                 HasCustomerInfo = hasCustomerInfo,
                 IsAdmin = isAdmin
@@ -341,9 +357,9 @@ namespace BE_QLTiemThuoc.Controllers
                 if (nhanVien == null)
                     return NotFound("Không tìm thấy nhân viên.");
 
-                // Tìm tài khoản liên kết
+                // Tìm tài khoản liên kết theo MaNV
                 var taiKhoan = await _context.TaiKhoans
-                    .FirstOrDefaultAsync(t => t.TenDangNhap == nhanVien.MaNV);
+                    .FirstOrDefaultAsync(t => t.MaNV == maNV);
 
                 if (taiKhoan == null)
                     return NotFound("Không tìm thấy tài khoản cho nhân viên này.");

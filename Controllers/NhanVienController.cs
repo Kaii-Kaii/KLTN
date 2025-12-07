@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.Services;
+using BE_QLTiemThuoc.Dto;
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -22,6 +23,38 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(list);
         }
 
+        [HttpGet("usernames")]
+        public async Task<ActionResult<IEnumerable<string>>> GetAvailableUsernames()
+        {
+            try
+            {
+                var usernames = await _service.GetAllUsernamesAsync();
+                return Ok(usernames);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách tên đăng nhập", error = ex.Message });
+            }
+        }
+
+        [HttpGet("{id}/account-status")]
+        public async Task<ActionResult> GetAccountStatus(string id)
+        {
+            try
+            {
+                var nhanVien = await _service.GetByIdAsync(id);
+                if (nhanVien == null)
+                    return NotFound(new { success = false, message = "Không tìm thấy nhân viên" });
+
+                var accountStatus = await _service.GetAccountStatusAsync(id);
+                return Ok(new { success = true, data = accountStatus });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi lấy trạng thái tài khoản", error = ex.Message });
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<NhanVien>> GetById(string id)
         {
@@ -31,20 +64,64 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(nv);
         }
 
-        [HttpPost]
-        public async Task<ActionResult<NhanVien>> Create([FromBody] NhanVien nhanVien)
+        [HttpGet("{id}/with-account")]
+        public async Task<ActionResult> GetByIdWithAccount(string id)
+        {
+            try
+            {
+                var nv = await _service.GetByIdAsync(id);
+                if (nv == null)
+                    return NotFound(new { message = "Không tìm thấy nhân viên" });
+
+                // Lấy thông tin tài khoản
+                var taiKhoan = await _service.GetAccountInfoAsync(id);
+                
+                return Ok(new {
+                    maNV = nv.MaNV,
+                    hoTen = nv.HoTen,
+                    dienThoai = nv.DienThoai,
+                    diaChi = nv.DiaChi,
+                    email = taiKhoan?.EMAIL,
+                    ngaySinh = nv.NgaySinh,
+                    gioiTinh = nv.GioiTinh,
+                    chucVu = nv.ChucVu,
+                    tenDangNhap = taiKhoan?.TenDangNhap
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thông tin nhân viên", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Endpoint mới: Tạo nhân viên cùng với tài khoản đăng nhập
+        /// </summary>
+        [HttpPost("create-with-account")]
+        public async Task<ActionResult<NhanVienCreateResponseDto>> CreateWithAccount([FromBody] NhanVienCreateDto createDto)
         {
             try
             {
                 if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                    return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ", errors = ModelState });
 
-                var result = await _service.CreateAsync(nhanVien);
-                return CreatedAtAction(nameof(GetById), new { id = result.MaNV }, result);
+                var result = await _service.CreateWithAccountAsync(createDto);
+                return CreatedAtAction(nameof(GetById), new { id = result.MaNV }, new
+                {
+                    success = true,
+                    message = result.Message,
+                    data = result
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi tạo nhân viên", error = ex.Message });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi tạo nhân viên",
+                    error = ex.Message,
+                    details = ex.InnerException?.Message
+                });
             }
         }
 
@@ -79,6 +156,40 @@ namespace BE_QLTiemThuoc.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi xóa nhân viên", error = ex.Message });
+            }
+        }
+
+        [HttpPost("{id}/disable-account")]
+        public async Task<IActionResult> DisableAccount(string id)
+        {
+            try
+            {
+                var result = await _service.DisableAccountAsync(id);
+                if (!result)
+                    return NotFound(new { success = false, message = "Không tìm thấy nhân viên" });
+
+                return Ok(new { success = true, message = "Tài khoản đã được vô hiệu hoá" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi vô hiệu hoá tài khoản", error = ex.Message });
+            }
+        }
+
+        [HttpPost("{id}/enable-account")]
+        public async Task<IActionResult> EnableAccount(string id)
+        {
+            try
+            {
+                var result = await _service.EnableAccountAsync(id);
+                if (!result)
+                    return NotFound(new { success = false, message = "Không tìm thấy nhân viên" });
+
+                return Ok(new { success = true, message = "Tài khoản đã được mở lại" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi mở tài khoản", error = ex.Message });
             }
         }
     }
