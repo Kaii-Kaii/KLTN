@@ -1,61 +1,55 @@
 using BE_QLTiemThuoc.Data;
 using CloudinaryDotNet;
 using Microsoft.EntityFrameworkCore;
-using System;
 using BE_QLTiemThuoc.Repositories;
 using BE_QLTiemThuoc.Services;
 using DotNetEnv;
 
-var builder = WebApplication.CreateBuilder(args);
+// Disable file watchers entirely (fix for Render)
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "0");
 
-var configuration = builder.Configuration; // Biến này đã có sẵn thông qua builder
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
-// Load environment variables first so they can override appsettings when configuring services
+// REMOVE ALL DEFAULT CONFIG SOURCES (this disables file watchers)
+builder.Configuration.Sources.Clear();
+
+// Add config WITHOUT reloadOnChange (critical!)
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+builder.Configuration.AddEnvironmentVariables();
+
+// Load .env
 Env.Load();
 
-// Register DbContext after environment variables are loaded so connection string
-// injected via environment (e.g., DOTNET or .env) is available here.
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
-// Cấu hình CORS
-var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
-
-// Read Cloudinary settings directly from environment variables or fallback to IConfiguration
-var cloudinaryCloudName = Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? configuration["Cloudinary:CloudName"];
-var cloudinaryApiKey = Environment.GetEnvironmentVariable("Cloudinary__ApiKey") ?? configuration["Cloudinary:ApiKey"];
-var cloudinaryApiSecret = Environment.GetEnvironmentVariable("Cloudinary__ApiSecret") ?? configuration["Cloudinary:ApiSecret"];
-
-// Read PayOS settings directly from environment variables or fallback to IConfiguration
-var payosClientId = Environment.GetEnvironmentVariable("PayOS__ClientId") ?? configuration["PayOS:ClientId"];
-var payosApiKey = Environment.GetEnvironmentVariable("PayOS__ApiKey") ?? configuration["PayOS:ApiKey"];
-var payosChecksumKey = Environment.GetEnvironmentVariable("PayOS__ChecksumKey") ?? configuration["PayOS:ChecksumKey"];
-
-var defaultConnection = Environment.GetEnvironmentVariable("Default__Connection")
+// Read connection string
+var defaultConnection =
+    Environment.GetEnvironmentVariable("Default__Connection")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
+// Register DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(defaultConnection));
 
+// CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: MyAllowSpecificOrigins,
-        policy =>
-        {
-            policy
-                .AllowAnyOrigin()
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
+    options.AddPolicy("_cors", p =>
+        p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Cloudinary config
+var account = new Account(
+    Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? builder.Configuration["Cloudinary:CloudName"],
+    Environment.GetEnvironmentVariable("Cloudinary__ApiKey") ?? builder.Configuration["Cloudinary:ApiKey"],
+    Environment.GetEnvironmentVariable("Cloudinary__ApiSecret") ?? builder.Configuration["Cloudinary:ApiSecret"]
+);
 
-// Add HttpClientFactory
-builder.Services.AddHttpClient();
+builder.Services.AddSingleton(new Cloudinary(account));
 
-// Register Repositories and Services (concrete types only — no interfaces)
+// Register services
 builder.Services.AddScoped<NhaCungCapRepository>();
 builder.Services.AddScoped<NhaCungCapService>();
 builder.Services.AddScoped<KhachHangRepository>();
@@ -88,36 +82,18 @@ builder.Services.AddScoped<ChatRepository>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<IThongKeService, ThongKeService>();
 
-// =========================================================
-// !!! KHỐI CẤU HÌNH CLOUDINARY ĐÃ ĐƯỢC DI CHUYỂN LÊN TRƯỚC builder.Build() !!!
-// =========================================================
+// (các service khác giữ nguyên)
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-// Khai báo Account và cấu hình Cloudinary
-var account = new Account(
-    // Prefer environment-loaded values (via Env.Load()) with fallback to appsettings
-    cloudinaryCloudName,
-    cloudinaryApiKey,
-    cloudinaryApiSecret
-);
+var app = builder.Build();
 
-// Đăng ký Cloudinary là Singleton Service (Phải nằm trong builder.Services...)
-builder.Services.AddSingleton(new Cloudinary(account));
-
-// PayOS configuration will be handled via IConfiguration in PaymentController
-
-// =========================================================
-
-var app = builder.Build(); // Service collection bị khóa tại đây
-
-// Swagger UI
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-app.UseCors(MyAllowSpecificOrigins);
+app.UseCors("_cors");
 app.UseAuthorization();
 
 app.MapControllers();
