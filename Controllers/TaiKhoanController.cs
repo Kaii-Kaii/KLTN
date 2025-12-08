@@ -167,26 +167,78 @@ namespace BE_QLTiemThuoc.Controllers
 
         // ========= LOGIN =========
         [HttpPost("Login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest req)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             var user = await _context.TaiKhoans
-                .FirstOrDefaultAsync(x => x.TenDangNhap == req.TenDangNhap && x.MatKhau == req.MatKhau);
+                .FirstOrDefaultAsync(u => u.TenDangNhap == request.TenDangNhap
+                                       && u.MatKhau == request.MatKhau);
 
             if (user == null)
-                return Unauthorized("Sai tài khoản hoặc mật khẩu.");
+                return Unauthorized("Sai tên đăng nhập hoặc mật khẩu.");
 
             if (user.ISEMAILCONFIRMED == 0)
                 return BadRequest("Tài khoản chưa xác thực email.");
 
-            return Ok(new
+            bool isAdmin = !string.IsNullOrEmpty(user.MaNV);
+            string vaiTro = isAdmin ? "Admin" : "User";
+            bool hasCustomerInfo = false;
+
+            // Nếu là KH bình thường → kiểm tra MaKH
+            if (!isAdmin)
+            {
+                if (string.IsNullOrEmpty(user.MaKH))
+                {
+                    // Lần đầu đăng nhập → tạo mã khách hàng mới
+                    string newMaKH = GenerateKhachHangCode();
+                    user.MaKH = newMaKH;
+
+                    var kh = new KhachHang
+                    {
+                        MAKH = newMaKH,
+                        HoTen = null,
+                        GioiTinh = null,
+                        NgaySinh = null,
+                        DiaChi = null,
+                        DienThoai = null
+                    };
+
+                    _context.KhachHangs.Add(kh);
+
+                    await _context.SaveChangesAsync();
+
+                    hasCustomerInfo = false;
+                }
+                else
+                {
+                    var kh = await _context.KhachHangs
+                        .FirstOrDefaultAsync(k => k.MAKH == user.MaKH);
+
+                    if (kh != null)
+                    {
+                        hasCustomerInfo = !string.IsNullOrEmpty(kh.HoTen)
+                                       && !string.IsNullOrEmpty(kh.DiaChi)
+                                       && !string.IsNullOrEmpty(kh.DienThoai);
+                    }
+                }
+            }
+
+            return Ok(new LoginResponse
             {
                 Message = "Đăng nhập thành công.",
                 MaTK = user.MaTK,
                 TenDangNhap = user.TenDangNhap,
                 Email = user.EMAIL,
-                IsAdmin = !string.IsNullOrEmpty(user.MaNV)
+                MaKH = user.MaKH,        // 🔥 FE CẦN CÁI NÀY
+                MaNV = user.MaNV,
+                VaiTro = vaiTro,
+                HasCustomerInfo = hasCustomerInfo,
+                IsAdmin = isAdmin
             });
         }
+
 
         // ========= CONFIRM EMAIL =========
         [HttpGet("ConfirmEmail")]
@@ -213,5 +265,17 @@ namespace BE_QLTiemThuoc.Controllers
             int num = int.Parse((last?.MaTK ?? "TK0000")[2..]) + 1;
             return "TK" + num.ToString("D4");
         }
+        private string GenerateKhachHangCode()
+        {
+            var last = _context.KhachHangs
+                .OrderByDescending(k => k.MAKH)
+                .FirstOrDefault();
+
+            string lastCode = last?.MAKH ?? "KH0000";
+            int number = int.Parse(lastCode.Substring(2)) + 1;
+
+            return "KH" + number.ToString("D4");
+        }
+
     }
 }
