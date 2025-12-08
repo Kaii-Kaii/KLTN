@@ -958,9 +958,9 @@ namespace BE_QLTiemThuoc.Controllers
 
                 // Send email via SMTP (reuse settings from TaiKhoanController)
                 // Send email via SMTP (reuse settings from TaiKhoanController)
-                var smtp = new SmtpClient("smtp.gmail.com")
+                var smtp = new SmtpClient("smtp.sendgrid.net")
                 {
-                    Credentials = new NetworkCredential("chaytue0203@gmail.com", "svyxqaobbihfvaac"),
+                    Credentials = new NetworkCredential("apikey", Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword")),
                     EnableSsl = true,
                     Port = 587
                 };
@@ -969,12 +969,13 @@ namespace BE_QLTiemThuoc.Controllers
                     ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon"
                     : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
 
-                var mail = new MailMessage("chaytue0203@gmail.com", toEmail) // FROM phải trùng Gmail login
+                var mail = new MailMessage("dqk.clone17@gmail.com", toEmail)
                 {
                     Subject = subject,
                     Body = html.ToString(),
                     IsBodyHtml = true
                 };
+
 
                 await smtp.SendMailAsync(mail);
 
