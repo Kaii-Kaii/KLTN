@@ -21,6 +21,45 @@ namespace BE_QLTiemThuoc.Controllers
             _configuration = configuration;
         }
 
+        // ====== HÀM DÙNG CHUNG ĐỌC SMTP CONFIG ======
+        private (string Host, int Port, string Username, string Password, string FromEmail) GetSmtpConfig()
+        {
+            var host = Environment.GetEnvironmentVariable("EmailSettings__SmtpHost")
+                       ?? _configuration["EmailSettings:SmtpHost"]
+                       ?? "smtp.gmail.com";
+
+            var portStr = Environment.GetEnvironmentVariable("EmailSettings__SmtpPort")
+                          ?? _configuration["EmailSettings:SmtpPort"]
+                          ?? "587";
+
+            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername")
+                           ?? _configuration["EmailSettings:SmtpUsername"];
+
+            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword")
+                           ?? _configuration["EmailSettings:SmtpPassword"];
+
+            // From có thể cấu hình, nếu không thì mặc định = username (Gmail yêu cầu vậy)
+            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From")
+                            ?? _configuration["EmailSettings:From"]
+                            ?? username;
+
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException("SMTP credentials are not configured.");
+            }
+
+            if (string.IsNullOrWhiteSpace(fromEmail))
+            {
+                fromEmail = username!;
+            }
+
+            int port = int.TryParse(portStr, out var p) ? p : 587;
+
+            return (host, port, username!, password!, fromEmail!);
+        }
+
+        // ====== API ======
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TaiKhoan>>> GetAll()
         {
@@ -34,7 +73,6 @@ namespace BE_QLTiemThuoc.Controllers
                 return BadRequest("Thiếu tên đăng nhập.");
 
             var exists = await _context.TaiKhoans.AnyAsync(u => u.TenDangNhap == username);
-            // Trả về true nếu đã tồn tại, false nếu chưa
             return Ok(new CheckUsernameResponse { Exists = exists });
         }
 
@@ -48,7 +86,6 @@ namespace BE_QLTiemThuoc.Controllers
                     return BadRequest(ModelState);
                 }
 
-                // Kiểm tra tên đăng nhập đã tồn tại
                 var existingUser = await _context.TaiKhoans
                     .FirstOrDefaultAsync(u => u.TenDangNhap == request.TenDangNhap);
                 if (existingUser != null)
@@ -64,7 +101,6 @@ namespace BE_QLTiemThuoc.Controllers
                 }
                 string emailToken = Convert.ToBase64String(tokenBytes);
 
-                // Tạo đối tượng TaiKhoan từ DTO
                 var newAccount = new TaiKhoan
                 {
                     MaTK = GenerateAccountCode(),
@@ -80,14 +116,20 @@ namespace BE_QLTiemThuoc.Controllers
                 _context.TaiKhoans.Add(newAccount);
                 await _context.SaveChangesAsync();
 
-                // Gửi email xác thực
+                // Base URL: lấy từ env trước, rồi mới fallback
                 var baseUrl = Environment.GetEnvironmentVariable("App__BaseUrl")
-                            ?? _configuration["App:BaseUrl"]
-                            ?? $"{Request.Scheme}://{Request.Host.Value}";
-                string confirmationLink = $"{baseUrl}/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(emailToken)}";
+                              ?? _configuration["App:BaseUrl"]
+                              ?? $"{Request.Scheme}://{Request.Host.Value}";
+
+                string confirmationLink =
+                    $"{baseUrl.TrimEnd('/')}/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(emailToken)}";
+
                 await SendConfirmationEmail(newAccount.EMAIL!, confirmationLink);
 
-                return Ok(new RegisterResponse { Message = "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực." });
+                return Ok(new RegisterResponse
+                {
+                    Message = "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực."
+                });
             }
             catch (Exception ex)
             {
@@ -101,32 +143,32 @@ namespace BE_QLTiemThuoc.Controllers
 
         private async Task SendConfirmationEmail(string toEmail, string confirmationLink)
         {
-            // Read SMTP settings from environment variables first, then fallback to appsettings.json
-            var host = Environment.GetEnvironmentVariable("EmailSettings__SmtpHost") ?? _configuration["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
-            var portStr = Environment.GetEnvironmentVariable("EmailSettings__SmtpPort") ?? _configuration["EmailSettings:SmtpPort"] ?? "587";
-            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername") ?? _configuration["EmailSettings:SmtpUsername"];
-            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword") ?? _configuration["EmailSettings:SmtpPassword"];
-            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From") ?? _configuration["EmailSettings:From"] ?? username;
+            var smtpConfig = GetSmtpConfig();
 
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            using var smtp = new SmtpClient(smtpConfig.Host)
             {
-                throw new InvalidOperationException("SMTP credentials are not configured.");
-            }
-
-            int port = int.TryParse(portStr, out var p) ? p : 587;
-
-            using var smtp = new SmtpClient(host)
-            {
-                Credentials = new NetworkCredential(username, password),
+                Credentials = new NetworkCredential(smtpConfig.Username, smtpConfig.Password),
                 EnableSsl = true,
-                Port = port
+                Port = smtpConfig.Port,
+                Timeout = 10000
             };
 
-            using var mail = new MailMessage(fromEmail!, toEmail)
+            var body = $@"
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                    <h2 style='color:#03A9F4;'>Xác thực tài khoản Medion</h2>
+                    <p>Chào bạn,</p>
+                    <p>Vui lòng xác thực tài khoản bằng cách click vào link bên dưới:</p>
+                    <p><a href='{confirmationLink}' style='color:#03A9F4;' target='_blank'>{confirmationLink}</a></p>
+                    <p>Nếu bạn không đăng ký tài khoản, vui lòng bỏ qua email này.</p>
+                </div>";
+
+            using var mail = new MailMessage(smtpConfig.FromEmail, toEmail)
             {
                 Subject = "Xác thực tài khoản",
-                Body = $"Vui lòng xác thực tài khoản bằng cách click vào link: {confirmationLink}"
+                Body = body,
+                IsBodyHtml = true
             };
+
             await smtp.SendMailAsync(mail);
         }
 
@@ -186,29 +228,24 @@ namespace BE_QLTiemThuoc.Controllers
             if (user.ISEMAILCONFIRMED == 0)
                 return BadRequest("Tài khoản chưa xác thực email.");
 
-            // Kiểm tra vai trò: Nếu có MaNV thì là Admin (Nhân viên)
             bool isAdmin = !string.IsNullOrEmpty(user.MaNV);
             bool hasCustomerInfo = false;
             string vaiTro = "User";
 
-            // Nếu là Admin (có MaNV) - chuyển thẳng đến trang admin, không cần tạo mã khách hàng
             if (isAdmin)
             {
                 vaiTro = "Admin";
-                hasCustomerInfo = true; // Admin không cần nhập thông tin
+                hasCustomerInfo = true;
             }
             else
             {
-                // Nếu là User (không có MaNV) và chưa có MaKH, tự động tạo mã khách hàng
                 if (string.IsNullOrEmpty(user.MaKH))
                 {
                     string newMaKH = GenerateKhachHangCode();
 
-                    // Gán MaKH vào TaiKhoan
                     user.MaKH = newMaKH;
                     _context.TaiKhoans.Update(user);
 
-                    // Tạo bản ghi KhachHang mới với thông tin rỗng
                     var newKhachHang = new KhachHang
                     {
                         MAKH = newMaKH,
@@ -221,19 +258,15 @@ namespace BE_QLTiemThuoc.Controllers
 
                     _context.KhachHangs.Add(newKhachHang);
 
-                    // Lưu cả MaKH vào bảng TaiKhoan và bản ghi KhachHang mới
                     await _context.SaveChangesAsync();
 
-                    // Chưa điền thông tin nên hasCustomerInfo = false
                     hasCustomerInfo = false;
                 }
                 else
                 {
-                    // Đã có MaKH, kiểm tra xem đã điền đầy đủ thông tin chưa
                     var khachHang = await _context.KhachHangs.FirstOrDefaultAsync(k => k.MAKH == user.MaKH);
                     if (khachHang != null)
                     {
-                        // Kiểm tra các trường bắt buộc: HoTen, DienThoai, DiaChi
                         hasCustomerInfo = !string.IsNullOrEmpty(khachHang.HoTen)
                                        && !string.IsNullOrEmpty(khachHang.DienThoai)
                                        && !string.IsNullOrEmpty(khachHang.DiaChi);
@@ -270,7 +303,6 @@ namespace BE_QLTiemThuoc.Controllers
             return "KH" + number.ToString("D4");
         }
 
-        // Gửi OTP về email khi quên mật khẩu
         [HttpPost("SendOtp")]
         public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
         {
@@ -285,35 +317,23 @@ namespace BE_QLTiemThuoc.Controllers
             if (user == null)
                 return NotFound("Không tìm thấy tài khoản với tên đăng nhập và email này.");
 
-            // Sinh OTP ngẫu nhiên 6 số
             var rng = new Random();
             int otp = rng.Next(100000, 999999);
 
             user.OTP = otp;
             await _context.SaveChangesAsync();
 
-            // Read SMTP settings
-            var host = Environment.GetEnvironmentVariable("EmailSettings__SmtpHost") ?? _configuration["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
-            var portStr = Environment.GetEnvironmentVariable("EmailSettings__SmtpPort") ?? _configuration["EmailSettings:SmtpPort"] ?? "587";
-            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername") ?? _configuration["EmailSettings:SmtpUsername"];
-            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword") ?? _configuration["EmailSettings:SmtpPassword"];
-            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From") ?? _configuration["EmailSettings:From"] ?? username;
+            var smtpConfig = GetSmtpConfig();
 
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            using var smtp = new SmtpClient(smtpConfig.Host)
             {
-                return StatusCode(500, new { message = "SMTP credentials are not configured." });
-            }
-
-            int port = int.TryParse(portStr, out var p) ? p : 587;
-
-            using var smtp = new SmtpClient(host)
-            {
-                Credentials = new NetworkCredential(username, password),
+                Credentials = new NetworkCredential(smtpConfig.Username, smtpConfig.Password),
                 EnableSsl = true,
-                Port = port
+                Port = smtpConfig.Port,
+                Timeout = 10000
             };
 
-            using var mail = new MailMessage(fromEmail!, user.EMAIL!)
+            using var mail = new MailMessage(smtpConfig.FromEmail, user.EMAIL!)
             {
                 Subject = "Mã OTP đặt lại mật khẩu - Medion",
                 Body = $@"
@@ -324,7 +344,7 @@ namespace BE_QLTiemThuoc.Controllers
                         <div style='background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0;'>
                             <h1 style='color: #17a2b8; margin: 0; font-size: 36px; letter-spacing: 5px;'>{otp}</h1>
                         </div>
-<p>Mã OTP có hiệu lực trong 5 phút.</p>
+                        <p>Mã OTP có hiệu lực trong 5 phút.</p>
                         <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
                         <hr style='margin: 30px 0; border: none; border-top: 1px solid #ddd;'>
                         <p style='color: #6c757d; font-size: 12px;'>Đây là email tự động, vui lòng không trả lời.</p>
@@ -356,7 +376,7 @@ namespace BE_QLTiemThuoc.Controllers
                 return BadRequest("OTP không đúng hoặc đã hết hạn.");
 
             user.MatKhau = request.MatKhauMoi;
-            user.OTP = null; // Xóa OTP sau khi đổi mật khẩu thành công
+            user.OTP = null;
             await _context.SaveChangesAsync();
 
             return Ok(new ResetPasswordResponse { Message = "Đổi mật khẩu thành công. Vui lòng đăng nhập lại." });
@@ -373,19 +393,16 @@ namespace BE_QLTiemThuoc.Controllers
                 if (string.IsNullOrWhiteSpace(request.NewPassword))
                     return BadRequest("Mật khẩu mới không được để trống.");
 
-                // Tìm nhân viên
                 var nhanVien = await _context.NhanViens.FirstOrDefaultAsync(n => n.MaNV == maNV);
                 if (nhanVien == null)
                     return NotFound("Không tìm thấy nhân viên.");
 
-                // Tìm tài khoản liên kết
                 var taiKhoan = await _context.TaiKhoans
                     .FirstOrDefaultAsync(t => t.TenDangNhap == nhanVien.MaNV);
 
                 if (taiKhoan == null)
                     return NotFound("Không tìm thấy tài khoản cho nhân viên này.");
 
-                // Cập nhật mật khẩu
                 taiKhoan.MatKhau = request.NewPassword;
                 _context.TaiKhoans.Update(taiKhoan);
                 await _context.SaveChangesAsync();
@@ -397,6 +414,5 @@ namespace BE_QLTiemThuoc.Controllers
                 return StatusCode(500, new { message = "Lỗi khi reset mật khẩu.", error = ex.Message });
             }
         }
-
     }
 }

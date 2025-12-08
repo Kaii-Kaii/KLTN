@@ -957,15 +957,19 @@ namespace BE_QLTiemThuoc.Controllers
 </html>");
 
                 // Send email via SMTP (reuse settings from TaiKhoanController)
+                // Send email via SMTP (reuse settings from TaiKhoanController)
                 var smtp = new SmtpClient("smtp.gmail.com")
                 {
-                    Credentials = new NetworkCredential("chaytue0203@gmail.com", "kctw ltds teaj luvb"),
+                    Credentials = new NetworkCredential("chaytue0203@gmail.com", "svyxqaobbihfvaac"),
                     EnableSsl = true,
                     Port = 587
                 };
 
-                var subject = isCancelled ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon" : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
-                var mail = new MailMessage("khangtuong040@gmail.com", toEmail)
+                var subject = isCancelled
+                    ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon"
+                    : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
+
+                var mail = new MailMessage("chaytue0203@gmail.com", toEmail) // FROM phải trùng Gmail login
                 {
                     Subject = subject,
                     Body = html.ToString(),
@@ -974,7 +978,9 @@ namespace BE_QLTiemThuoc.Controllers
 
                 await smtp.SendMailAsync(mail);
 
+                // Kết quả trả về
                 return new { SentTo = toEmail, MaHD = invoice.MaHD };
+
             });
 
             return Ok(response);
