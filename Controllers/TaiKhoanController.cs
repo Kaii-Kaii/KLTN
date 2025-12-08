@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using BE_QLTiemThuoc.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Net;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.DTOs;
 using SendGrid;
@@ -22,196 +21,197 @@ namespace BE_QLTiemThuoc.Controllers
             _configuration = configuration;
         }
 
-        // Không còn dùng SMTP nữa, giữ lại để khỏi lỗi nhưng không dùng
-        private (string Host, int Port, string Username, string Password, string FromEmail) GetSmtpConfig()
+        // ========= LOAD CONFIG SENDGRID =========
+        private (string FromEmail, string ApiKey) GetEmailConfig()
         {
-            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername")
-                           ?? _configuration["EmailSettings:SmtpUsername"];
+            var from = Environment.GetEnvironmentVariable("EmailSettings__From")
+                        ?? _configuration["EmailSettings:From"];
 
-            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword")
-                           ?? _configuration["EmailSettings:SmtpPassword"];
+            var apiKey = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword")
+                         ?? _configuration["EmailSettings:SmtpPassword"];
 
-            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From")
-                            ?? _configuration["EmailSettings:From"]
-                            ?? username;
+            if (string.IsNullOrEmpty(apiKey))
+                throw new Exception("Thiếu SendGrid API key");
 
-            return ("", 0, username!, password!, fromEmail!);
+            return (from!, apiKey!);
         }
 
-        // ===== API =====
+        // ========= API LẤY TẤT CẢ =========
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TaiKhoan>>> GetAll()
+        {
+            return await _context.TaiKhoans.ToListAsync();
+        }
+
+        // ========= CHECK USERNAME =========
+        [HttpGet("CheckUsername")]
+        public async Task<IActionResult> CheckUsername([FromQuery] string username)
+        {
+            var exists = await _context.TaiKhoans.AnyAsync(x => x.TenDangNhap == username);
+            return Ok(new { Exists = exists });
+        }
+
+        // ========= CREATE ACCOUNT =========
         [HttpPost]
-        public async Task<IActionResult> CreateAccount([FromBody] RegisterRequest request)
+        public async Task<IActionResult> CreateAccount([FromBody] RegisterRequest req)
         {
-            try
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (await _context.TaiKhoans.AnyAsync(x => x.TenDangNhap == req.TenDangNhap))
+                return BadRequest("Tên đăng nhập đã tồn tại.");
+
+            // tạo token
+            var bytes = new byte[32];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+                rng.GetBytes(bytes);
+
+            string token = Convert.ToBase64String(bytes);
+
+            var tk = new TaiKhoan
             {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                MaTK = GenerateAccountCode(),
+                TenDangNhap = req.TenDangNhap,
+                MatKhau = req.MatKhau,
+                EMAIL = req.Email,
+                ISEMAILCONFIRMED = 0,
+                EMAILCONFIRMATIONTOKEN = token
+            };
 
-                var existingUser = await _context.TaiKhoans
-                    .FirstOrDefaultAsync(u => u.TenDangNhap == request.TenDangNhap);
-                if (existingUser != null)
-                    return BadRequest("Tên đăng nhập đã tồn tại.");
+            _context.TaiKhoans.Add(tk);
+            await _context.SaveChangesAsync();
 
-                // Sinh token
-                var tokenBytes = new byte[32];
-                using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-                    rng.GetBytes(tokenBytes);
+            // Auto detect domain (local hoặc Render)
+            string baseUrl = $"{Request.Scheme}://{Request.Host}";
+            string link = $"{baseUrl}/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(token)}";
 
-                string emailToken = Convert.ToBase64String(tokenBytes);
+            await SendConfirmationEmail(req.Email!, link);
 
-                var newAccount = new TaiKhoan
-                {
-                    MaTK = GenerateAccountCode(),
-                    TenDangNhap = request.TenDangNhap,
-                    MatKhau = request.MatKhau,
-                    EMAIL = request.Email,
-                    ISEMAILCONFIRMED = 0,
-                    EMAILCONFIRMATIONTOKEN = emailToken,
-                };
-
-                _context.TaiKhoans.Add(newAccount);
-                await _context.SaveChangesAsync();
-
-                var baseUrl = Environment.GetEnvironmentVariable("App__BaseUrl")
-                              ?? _configuration["App:BaseUrl"]
-                              ?? $"{Request.Scheme}://{Request.Host.Value}";
-
-                string confirmationLink =
-                    $"{baseUrl.TrimEnd('/')}/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(emailToken)}";
-
-                await SendConfirmationEmail(newAccount.EMAIL!, confirmationLink);
-
-                return Ok(new RegisterResponse
-                {
-                    Message = "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực."
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi server", error = ex.Message });
-            }
+            return Ok(new { Message = "Tạo tài khoản thành công." });
         }
 
-        // ❤️❤️ SỬ DỤNG SENDGRID TẠI ĐÂY ❤️❤️
-        private async Task SendConfirmationEmail(string toEmail, string confirmationLink)
+        // ========= GỬI EMAIL XÁC MINH =========
+        private async Task SendConfirmationEmail(string toEmail, string link)
         {
-            var smtp = GetSmtpConfig();
-            var apiKey = smtp.Password; // API KEY SendGrid lưu ở đây
+            var cfg = GetEmailConfig();
+            var client = new SendGridClient(cfg.ApiKey);
 
-            var client = new SendGridClient(apiKey);
-
-            var from = new EmailAddress(smtp.FromEmail, "Medion");
+            var from = new EmailAddress(cfg.FromEmail, "Medion");
             var to = new EmailAddress(toEmail);
 
-            var body = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <h2 style='color:#03A9F4;'>Xác thực tài khoản Medion</h2>
-                    <p>Chào bạn,</p>
-                    <p>Vui lòng xác thực tài khoản bằng cách click vào link bên dưới:</p>
-                    <p><a href='{confirmationLink}' target='_blank'>{confirmationLink}</a></p>
+            string html = $@"
+                <div style='font-family:Arial'>
+                    <h2 style='color:#03A9F4'>Xác thực tài khoản Medion</h2>
+                    <p>Nhấn để xác thực:</p>
+                    <a href='{link}' target='_blank'>{link}</a>
                 </div>";
 
-            var msg = MailHelper.CreateSingleEmail(from, to, "Xác thực tài khoản", "", body);
+            var msg = MailHelper.CreateSingleEmail(from, to, "Xác thực tài khoản", "", html);
 
             await client.SendEmailAsync(msg);
         }
 
-        // ========== OTP ==========
+        // ========= SEND OTP =========
         [HttpPost("SendOtp")]
-        public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
+        public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest req)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
             var user = await _context.TaiKhoans
-                .FirstOrDefaultAsync(u => u.TenDangNhap == request.TenDangNhap && u.EMAIL == request.Email);
+                .FirstOrDefaultAsync(x => x.TenDangNhap == req.TenDangNhap && x.EMAIL == req.Email);
 
             if (user == null)
                 return NotFound("Không tìm thấy tài khoản.");
 
-            var otp = new Random().Next(100000, 999999);
-
+            int otp = new Random().Next(100000, 999999);
             user.OTP = otp;
+
             await _context.SaveChangesAsync();
 
-            // Gửi OTP qua SendGrid
-            var smtp = GetSmtpConfig();
-            var apiKey = smtp.Password;
+            var cfg = GetEmailConfig();
+            var client = new SendGridClient(cfg.ApiKey);
 
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(smtp.FromEmail, "Medion");
-            var to = new EmailAddress(user.EMAIL!);
+            var from = new EmailAddress(cfg.FromEmail, "Medion");
+            var to = new EmailAddress(req.Email);
 
-            string body = $@"
-                <div style='font-family: Arial;'>
-                    <h2 style='color:#17a2b8;'>Đặt lại mật khẩu</h2>
-                    <p>Mã OTP của bạn:</p>
-                    <h1 style='color:#17a2b8;'>{otp}</h1>
+            string html = $@"
+                <div style='font-family:Arial'>
+                    <h2 style='color:#17a2b8'>OTP đặt lại mật khẩu</h2>
+                    <h1>{otp}</h1>
                 </div>";
 
-            var msg = MailHelper.CreateSingleEmail(from, to, "Mã OTP đặt lại mật khẩu", "", body);
+            var msg = MailHelper.CreateSingleEmail(from, to, "Mã OTP đặt lại mật khẩu", "", html);
             await client.SendEmailAsync(msg);
 
-            return Ok(new SendOtpResponse { Message = "OTP đã được gửi." });
+            return Ok(new { Message = "OTP đã được gửi." });
         }
 
-        // ========= RESET PASSWORD ==========
-        // Không đổi gì trong logic này
+        // ========= RESET PASSWORD =========
         [HttpPost("ResetPassword")]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
             var user = await _context.TaiKhoans
-                .FirstOrDefaultAsync(u => u.TenDangNhap == request.TenDangNhap && u.EMAIL == request.Email);
+                .FirstOrDefaultAsync(x => x.TenDangNhap == req.TenDangNhap && x.EMAIL == req.Email);
 
             if (user == null)
                 return NotFound("Không tìm thấy tài khoản.");
 
-            if (user.OTP != request.Otp)
+            if (user.OTP != req.Otp)
                 return BadRequest("OTP không đúng.");
 
-            user.MatKhau = request.MatKhauMoi;
+            user.MatKhau = req.MatKhauMoi;
             user.OTP = null;
+
             await _context.SaveChangesAsync();
 
-            return Ok(new ResetPasswordResponse { Message = "Đổi mật khẩu thành công." });
+            return Ok(new { Message = "Đổi mật khẩu thành công." });
         }
 
-        // ========= CONFIRM EMAIL ==========
-        [HttpGet("ConfirmEmail")]
-        public async Task<IActionResult> ConfirmEmail([FromQuery] string token)
+        // ========= LOGIN =========
+        [HttpPost("Login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest req)
         {
-            if (string.IsNullOrEmpty(token))
-                return Content("Token không hợp lệ", "text/html");
-
             var user = await _context.TaiKhoans
-                .FirstOrDefaultAsync(u => u.EMAILCONFIRMATIONTOKEN == token);
+                .FirstOrDefaultAsync(x => x.TenDangNhap == req.TenDangNhap && x.MatKhau == req.MatKhau);
 
             if (user == null)
-                return Content("Token sai hoặc đã xác thực", "text/html");
+                return Unauthorized("Sai tài khoản hoặc mật khẩu.");
+
+            if (user.ISEMAILCONFIRMED == 0)
+                return BadRequest("Tài khoản chưa xác thực email.");
+
+            return Ok(new
+            {
+                Message = "Đăng nhập thành công.",
+                MaTK = user.MaTK,
+                TenDangNhap = user.TenDangNhap,
+                Email = user.EMAIL,
+                IsAdmin = !string.IsNullOrEmpty(user.MaNV)
+            });
+        }
+
+        // ========= CONFIRM EMAIL =========
+        [HttpGet("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail(string token)
+        {
+            var user = await _context.TaiKhoans
+                .FirstOrDefaultAsync(x => x.EMAILCONFIRMATIONTOKEN == token);
+
+            if (user == null)
+                return Content("Token không hợp lệ hoặc đã được dùng.");
 
             user.ISEMAILCONFIRMED = 1;
             user.EMAILCONFIRMATIONTOKEN = null;
+
             await _context.SaveChangesAsync();
 
-            return Content("<h2>Xác thực thành công!</h2>", "text/html");
+            return Content("<h2 style='color:#03A9F4'>Xác thực thành công!</h2>", "text/html");
         }
 
-        // ===== HELPER =====
+        // ========= HELPER =========
         private string GenerateAccountCode()
         {
             var last = _context.TaiKhoans.OrderByDescending(x => x.MaTK).FirstOrDefault();
-            int num = int.Parse((last?.MaTK ?? "TK0000").Substring(2)) + 1;
+            int num = int.Parse((last?.MaTK ?? "TK0000")[2..]) + 1;
             return "TK" + num.ToString("D4");
-        }
-
-        private string GenerateKhachHangCode()
-        {
-            var last = _context.KhachHangs.OrderByDescending(x => x.MAKH).FirstOrDefault();
-            int num = int.Parse((last?.MAKH ?? "KH0000").Substring(2)) + 1;
-            return "KH" + num.ToString("D4");
         }
     }
 }
