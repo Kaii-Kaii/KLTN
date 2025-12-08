@@ -10,6 +10,9 @@ using BE_QLTiemThuoc.Dto;
 using System.Net.Mail;
 using System.Net;
 using System.Globalization;
+using SendGrid;
+using SendGrid.Helpers.Mail;
+
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -172,7 +175,25 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // GET: api/HoaDon/nhanvien/{maNV}
+        // // GET: api/HoaDon/nhanvien/{maNV}
+        // [HttpGet("nhanvien/{maNV}")]
+        // public async Task<ActionResult<IEnumerable<HoaDon>>> GetHoaDonByNhanVien(string maNV)
+        // {
+        //     try
+        //     {
+        //         var hoaDons = await _ctx.HoaDons
+        //             .Where(h => h.MaNV == maNV)
+        //             .OrderByDescending(h => h.NgayLap)
+        //             .ToListAsync();
+        //         return Ok(hoaDons);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return BadRequest(new { message = ex.Message });
+        //     }
+        // }
+// GET: api/HoaDon/nhanvien/{maNV}
+      // GET: api/HoaDon/nhanvien/{maNV}
         [HttpGet("nhanvien/{maNV}")]
         public async Task<ActionResult<IEnumerable<object>>> GetHoaDonByNhanVien(string maNV)
         {
@@ -973,24 +994,38 @@ namespace BE_QLTiemThuoc.Controllers
 </html>");
 
                 // Send email via SMTP (reuse settings from TaiKhoanController)
-                var smtp = new SmtpClient("smtp.gmail.com")
+                // Send email via SMTP (reuse settings from TaiKhoanController)
+
+                var subject = isCancelled
+                    ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon"
+                    : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
+
+                var apiKey = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword");
+                var client = new SendGridClient(apiKey);
+
+                var from = new EmailAddress("dqk.clone17@gmail.com", "Nhà Thuốc Melion");
+                var to = new EmailAddress(toEmail);
+
+                var msg = MailHelper.CreateSingleEmail(
+                    from,
+                    to,
+                    subject,
+                    plainTextContent: "",
+                    htmlContent: html.ToString()
+                );
+
+                var sendResponse = await client.SendEmailAsync(msg);
+
+                if (!sendResponse.IsSuccessStatusCode)
                 {
-                    Credentials = new NetworkCredential("chaytue0203@gmail.com", "kctw ltds teaj luvb"),
-                    EnableSsl = true,
-                    Port = 587
-                };
+                    throw new Exception("Gửi email thất bại: " + sendResponse.StatusCode);
+                }
 
-                var subject = isCancelled ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon" : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
-                var mail = new MailMessage("khangtuong040@gmail.com", toEmail)
-                {
-                    Subject = subject,
-                    Body = html.ToString(),
-                    IsBodyHtml = true
-                };
 
-                await smtp.SendMailAsync(mail);
 
+                // Kết quả trả về
                 return new { SentTo = toEmail, MaHD = invoice.MaHD };
+
             });
 
             return Ok(response);
