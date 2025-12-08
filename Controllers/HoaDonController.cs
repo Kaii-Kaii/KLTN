@@ -10,6 +10,9 @@ using BE_QLTiemThuoc.Dto;
 using System.Net.Mail;
 using System.Net;
 using System.Globalization;
+using SendGrid;
+using SendGrid.Helpers.Mail;
+
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -958,26 +961,33 @@ namespace BE_QLTiemThuoc.Controllers
 
                 // Send email via SMTP (reuse settings from TaiKhoanController)
                 // Send email via SMTP (reuse settings from TaiKhoanController)
-                var smtp = new SmtpClient("smtp.sendgrid.net")
-                {
-                    Credentials = new NetworkCredential("apikey", Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword")),
-                    EnableSsl = true,
-                    Port = 587
-                };
 
                 var subject = isCancelled
                     ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon"
                     : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
 
-                var mail = new MailMessage("dqk.clone17@gmail.com", toEmail)
+                var apiKey = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword");
+                var client = new SendGridClient(apiKey);
+
+                var from = new EmailAddress("dqk.clone17@gmail.com", "Nhà Thuốc Melion");
+                var to = new EmailAddress(toEmail);
+
+                var msg = MailHelper.CreateSingleEmail(
+                    from,
+                    to,
+                    subject,
+                    plainTextContent: "",
+                    htmlContent: html.ToString()
+                );
+
+                var sendResponse = await client.SendEmailAsync(msg);
+
+                if (!sendResponse.IsSuccessStatusCode)
                 {
-                    Subject = subject,
-                    Body = html.ToString(),
-                    IsBodyHtml = true
-                };
+                    throw new Exception("Gửi email thất bại: " + sendResponse.StatusCode);
+                }
 
 
-                await smtp.SendMailAsync(mail);
 
                 // Kết quả trả về
                 return new { SentTo = toEmail, MaHD = invoice.MaHD };
