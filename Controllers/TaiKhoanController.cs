@@ -636,7 +636,9 @@
 //     }
 // }
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Data;
+using BE_QLTiemThuoc.Services;
 using Microsoft.EntityFrameworkCore;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.DTOs;
@@ -819,12 +821,29 @@ namespace BE_QLTiemThuoc.Controllers
             if (user.ISEMAILCONFIRMED == 0)
                 return BadRequest("Tài khoản chưa xác thực email.");
 
-            bool isAdmin = !string.IsNullOrEmpty(user.MaNV);
-            string vaiTro = isAdmin ? "Admin" : "User";
+            // Check admin status based on ChucVu from NhanVien table
+            bool isAdmin = false;
+            int? chucVu = null;
+            string vaiTro = "User";
+            
+            if (!string.IsNullOrEmpty(user.MaNV))
+            {
+                var nhanVien = await _context.Set<NhanVien>()
+                    .FirstOrDefaultAsync(nv => nv.MaNV == user.MaNV);
+                
+                if (nhanVien != null)
+                {
+                    chucVu = nhanVien.ChucVu;
+                    // ChucVu === 1 means Admin, anything else is Staff
+                    isAdmin = (nhanVien.ChucVu == 1);
+                    vaiTro = isAdmin ? "Admin" : "Staff";
+                }
+            }
+            
             bool hasCustomerInfo = false;
 
             // Nếu là KH bình thường → kiểm tra MaKH
-            if (!isAdmin)
+            if (!isAdmin && string.IsNullOrEmpty(user.MaNV))
             {
                 if (string.IsNullOrEmpty(user.MaKH))
                 {
@@ -868,8 +887,9 @@ namespace BE_QLTiemThuoc.Controllers
                 MaTK = user.MaTK,
                 TenDangNhap = user.TenDangNhap,
                 Email = user.EMAIL,
-                MaKH = user.MaKH,        // 🔥 FE CẦN CÁI NÀY
+                MaKH = user.MaKH,
                 MaNV = user.MaNV,
+                ChucVu = chucVu ?? 0,
                 VaiTro = vaiTro,
                 HasCustomerInfo = hasCustomerInfo,
                 IsAdmin = isAdmin
