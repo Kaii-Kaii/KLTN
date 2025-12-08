@@ -741,7 +741,7 @@ namespace BE_QLTiemThuoc.Controllers
 
                 // For placed (online) orders (status 0) there is no employee to display
                 var isPlaced = invoice.TrangThaiGiaoHang == 0;
-                var isCancelled = invoice.TrangThaiGiaoHang == -1;
+                var isCancelled = invoice.TrangThaiGiaoHang == -1 || invoice.TrangThaiGiaoHang == -2 || invoice.TrangThaiGiaoHang == -3;
                 var employeeName = isPlaced ? null : (nv != null ? nv.HoTen : (string.IsNullOrWhiteSpace(invoice.MaNV) ? "(không xác định)" : invoice.MaNV));
                 var totalSectionStyle = isCancelled ? "background:#fff0f0; border-left:4px solid #c82333;" : string.Empty;
                 var containerStyle = isCancelled ? "background:#fff0f0;" : string.Empty;
