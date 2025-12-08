@@ -13,10 +13,12 @@ namespace BE_QLTiemThuoc.Controllers
     public class TaiKhoanController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public TaiKhoanController(AppDbContext context)
+        public TaiKhoanController(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -79,8 +81,11 @@ namespace BE_QLTiemThuoc.Controllers
                 await _context.SaveChangesAsync();
 
                 // Gửi email xác thực
-                string confirmationLink = $"https://localhost:7283/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(emailToken)}";
-                await SendConfirmationEmail(newAccount.EMAIL, confirmationLink);
+                var baseUrl = Environment.GetEnvironmentVariable("App__BaseUrl")
+                            ?? _configuration["App:BaseUrl"]
+                            ?? $"{Request.Scheme}://{Request.Host.Value}";
+                string confirmationLink = $"{baseUrl}/api/TaiKhoan/ConfirmEmail?token={Uri.EscapeDataString(emailToken)}";
+                await SendConfirmationEmail(newAccount.EMAIL!, confirmationLink);
 
                 return Ok(new RegisterResponse { Message = "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực." });
             }
@@ -93,21 +98,38 @@ namespace BE_QLTiemThuoc.Controllers
                 });
             }
         }
+
         private async Task SendConfirmationEmail(string toEmail, string confirmationLink)
         {
-            var smtp = new SmtpClient("smtp.gmail.com") // Thêm host ở đây
+            // Read SMTP settings from environment variables first, then fallback to appsettings.json
+            var host = Environment.GetEnvironmentVariable("EmailSettings__SmtpHost") ?? _configuration["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
+            var portStr = Environment.GetEnvironmentVariable("EmailSettings__SmtpPort") ?? _configuration["EmailSettings:SmtpPort"] ?? "587";
+            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername") ?? _configuration["EmailSettings:SmtpUsername"];
+            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword") ?? _configuration["EmailSettings:SmtpPassword"];
+            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From") ?? _configuration["EmailSettings:From"] ?? username;
+
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
-                Credentials = new NetworkCredential("chaytue0203@gmail.com", "kctw ltds teaj luvb"),
+                throw new InvalidOperationException("SMTP credentials are not configured.");
+            }
+
+            int port = int.TryParse(portStr, out var p) ? p : 587;
+
+            using var smtp = new SmtpClient(host)
+            {
+                Credentials = new NetworkCredential(username, password),
                 EnableSsl = true,
-                Port = 587
+                Port = port
             };
-            var mail = new MailMessage("khangtuong040@gmail.com", toEmail)
+
+            using var mail = new MailMessage(fromEmail!, toEmail)
             {
                 Subject = "Xác thực tài khoản",
                 Body = $"Vui lòng xác thực tài khoản bằng cách click vào link: {confirmationLink}"
             };
             await smtp.SendMailAsync(mail);
         }
+
         [HttpGet("ConfirmEmail")]
         public async Task<IActionResult> ConfirmEmail([FromQuery] string token)
         {
@@ -135,6 +157,7 @@ namespace BE_QLTiemThuoc.Controllers
 ";
             return Content(html, "text/html; charset=utf-8");
         }
+
         private string GenerateAccountCode()
         {
             var lastAccount = _context.TaiKhoans
@@ -145,6 +168,7 @@ namespace BE_QLTiemThuoc.Controllers
             int number = int.Parse(lastCode.Substring(2)) + 1;
             return "TK" + number.ToString("D4");
         }
+
         [HttpPost("Login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -268,15 +292,28 @@ namespace BE_QLTiemThuoc.Controllers
             user.OTP = otp;
             await _context.SaveChangesAsync();
 
-            // Gửi OTP về email
-            var smtp = new SmtpClient("smtp.gmail.com")
+            // Read SMTP settings
+            var host = Environment.GetEnvironmentVariable("EmailSettings__SmtpHost") ?? _configuration["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
+            var portStr = Environment.GetEnvironmentVariable("EmailSettings__SmtpPort") ?? _configuration["EmailSettings:SmtpPort"] ?? "587";
+            var username = Environment.GetEnvironmentVariable("EmailSettings__SmtpUsername") ?? _configuration["EmailSettings:SmtpUsername"];
+            var password = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword") ?? _configuration["EmailSettings:SmtpPassword"];
+            var fromEmail = Environment.GetEnvironmentVariable("EmailSettings__From") ?? _configuration["EmailSettings:From"] ?? username;
+
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
-                Credentials = new NetworkCredential("chaytue0203@gmail.com", "kctw ltds teaj luvb"),
+                return StatusCode(500, new { message = "SMTP credentials are not configured." });
+            }
+
+            int port = int.TryParse(portStr, out var p) ? p : 587;
+
+            using var smtp = new SmtpClient(host)
+            {
+                Credentials = new NetworkCredential(username, password),
                 EnableSsl = true,
-                Port = 587
+                Port = port
             };
 
-            var mail = new MailMessage("khangtuong040@gmail.com", user.EMAIL)
+            using var mail = new MailMessage(fromEmail!, user.EMAIL!)
             {
                 Subject = "Mã OTP đặt lại mật khẩu - Medion",
                 Body = $@"
