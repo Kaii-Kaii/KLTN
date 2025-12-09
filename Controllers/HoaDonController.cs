@@ -845,7 +845,7 @@ namespace BE_QLTiemThuoc.Controllers
 <body>
     <div class='invoice-container' style='{containerStyle}'>
         <div class='header' style='{headerStyle}'>
-            <h1>🏥 NHÀ THUỐC MELiON</h1>
+            <h1>🏥 NHÀ THUỐC MEDION</h1>
             <h2>HÓA ĐƠN BÁN THUỐC</h2>
         </div>
         
@@ -987,7 +987,7 @@ namespace BE_QLTiemThuoc.Controllers
         <div class='footer'>
             <div class='thank-you'>Cảm ơn quý khách đã sử dụng dịch vụ!</div>
             <div class='footer-text'>📧 Email: support@nhathươcmelon.com | 📞 Hotline: 1900 xxxx</div>
-            <div class='footer-text'>🏠 Địa chỉ: 123 Đường ABC, Quận XYZ, TP. Hồ Chí Minh</div>
+            <div class='footer-text'>🏠 Địa chỉ: 140 Lê Trọng Tấn, Tân Phú</div>
         </div>
     </div>
 </body>
@@ -997,13 +997,13 @@ namespace BE_QLTiemThuoc.Controllers
                 // Send email via SMTP (reuse settings from TaiKhoanController)
 
                 var subject = isCancelled
-                    ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Melon"
-                    : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Melon";
+                    ? $"Xác nhận hoá đơn {invoice.MaHD} - Hủy - Tại nhà thuốc Medion"
+                    : $"Xác nhận hoá đơn {invoice.MaHD} - Tại nhà thuốc Medion";
 
                 var apiKey = Environment.GetEnvironmentVariable("EmailSettings__SmtpPassword");
                 var client = new SendGridClient(apiKey);
 
-                var from = new EmailAddress("dqk.clone17@gmail.com", "Nhà Thuốc Melion");
+                var from = new EmailAddress("dqk.clone17@gmail.com", "Nhà Thuốc Medion");
                 var to = new EmailAddress(toEmail);
 
                 var msg = MailHelper.CreateSingleEmail(

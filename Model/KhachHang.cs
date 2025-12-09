@@ -12,5 +12,8 @@ namespace BE_QLTiemThuoc.Model
         public string? GioiTinh { get; set; }
         public string? DiaChi { get; set; }
         public string? DienThoai { get; set; }
+        
+        // Navigation property to TaiKhoan
+        public virtual ICollection<TaiKhoan>? TaiKhoans { get; set; }
     }
 }
