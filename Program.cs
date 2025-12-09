@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using BE_QLTiemThuoc.Repositories;
 using BE_QLTiemThuoc.Services;
 using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.OpenApi.Models;
 
 // Disable file watchers entirely (fix for Render)
 Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "0");
@@ -37,12 +41,66 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("_cors", p =>
-        p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+   p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
+
+// ========= JWT CONFIGURATION =========
+var jwtSecretKey = Environment.GetEnvironmentVariable("Jwt__SecretKey")
+    ?? builder.Configuration["Jwt:SecretKey"]
+    ?? "YourSuperSecretKeyMustBeAtLeast32CharactersLong!";
+
+var jwtIssuer = Environment.GetEnvironmentVariable("Jwt__Issuer")
+    ?? builder.Configuration["Jwt:Issuer"]
+    ?? "BE_QLTiemThuoc";
+
+var jwtAudience = Environment.GetEnvironmentVariable("Jwt__Audience")
+?? builder.Configuration["Jwt:Audience"]
+    ?? "BE_QLTiemThuoc_Clients";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+   ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    // Policy cho Admin (ChucVu = 1)
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireClaim("ChucVu", "1"));
+    
+    // Policy cho Staff (có MaNV)
+    options.AddPolicy("StaffOnly", policy =>
+        policy.RequireAssertion(context =>
+         context.User.HasClaim(c => c.Type == "MaNV" && !string.IsNullOrEmpty(c.Value))));
+    
+    // Policy cho Admin hoặc Staff
+    options.AddPolicy("AdminOrStaff", policy =>
+   policy.RequireAssertion(context =>
+            context.User.HasClaim(c => c.Type == "ChucVu" && c.Value == "1") ||
+            context.User.HasClaim(c => c.Type == "MaNV" && !string.IsNullOrEmpty(c.Value))));
+});
+
+// Register JWT Service
+builder.Services.AddScoped<JwtService>();
 
 // Cloudinary config
 var account = new Account(
-    Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? builder.Configuration["Cloudinary:CloudName"],
+  Environment.GetEnvironmentVariable("Cloudinary__CloudName") ?? builder.Configuration["Cloudinary:CloudName"],
     Environment.GetEnvironmentVariable("Cloudinary__ApiKey") ?? builder.Configuration["Cloudinary:ApiKey"],
     Environment.GetEnvironmentVariable("Cloudinary__ApiSecret") ?? builder.Configuration["Cloudinary:ApiSecret"]
 );
@@ -85,7 +143,47 @@ builder.Services.AddScoped<IThongKeService, ThongKeService>();
 // (các service khác giữ nguyên)
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// ========= SWAGGER WITH JWT SUPPORT =========
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "BE_QLTiemThuoc API", 
+        Version = "v1",
+    Description = "API quản lý tiệm thuốc với JWT Authentication"
+    });
+
+// Thêm JWT Authentication vào Swagger
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = @"JWT Authorization header using the Bearer scheme. 
+        Nhập 'Bearer' [space] và token của bạn.
+ Ví dụ: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'",
+        Name = "Authorization",
+   In = ParameterLocation.Header,
+   Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+    {
+     {
+            new OpenApiSecurityScheme
+            {
+          Reference = new OpenApiReference
+     {
+              Type = ReferenceType.SecurityScheme,
+             Id = "Bearer"
+              },
+ Scheme = "oauth2",
+    Name = "Bearer",
+    In = ParameterLocation.Header,
+          },
+         new List<string>()
+   }
+    });
+});
 
 var app = builder.Build();
 
@@ -94,6 +192,9 @@ app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseCors("_cors");
+
+// ========= IMPORTANT: UseAuthentication MUST come before UseAuthorization =========
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

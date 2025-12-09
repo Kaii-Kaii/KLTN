@@ -12,6 +12,7 @@ namespace BE_QLTiemThuoc.Dto
         public string? MaHD { get; set; }
         public string? MaNV { get; set; }
         public string? GhiChu { get; set; }
+        public decimal? TongTien { get; set; }  // Optional total to override
 
         public List<ChiTietHoaDonCreateDto>? Items { get; set; }
             // Optional note to attach to the invoice when confirming
