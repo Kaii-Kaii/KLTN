@@ -5,6 +5,7 @@ using BE_QLTiemThuoc.Services;
 using System.Text;
 using System.IO;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using BE_QLTiemThuoc.Dto;
 using System.Net.Mail;
@@ -18,6 +19,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]  // 🔐 Yêu cầu đăng nhập cho tất cả các API trong controller này
     public class HoaDonController : ControllerBase
     {
         private readonly AppDbContext _ctx;
@@ -28,22 +30,23 @@ namespace BE_QLTiemThuoc.Controllers
         //danh sách hoá đơn
         // GET: api/HoaDon/Search?from=2025-11-01&to=2025-11-07&status=3
         [HttpGet("Search")]
+   [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff
         public async Task<IActionResult> Search([FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int? status, [FromQuery] string? loai)
-        {
-            var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
-            {
-                DateTime? fromDate = null;
-                DateTime? toDate = null;
+{
+    var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
+    {
+        DateTime? fromDate = null;
+        DateTime? toDate = null;
 
-                var q = _ctx.HoaDons.AsQueryable();
-                // apply date filter only when both from and to are provided
-                if (from != null && to != null)
-                {
-                    fromDate = from.Value.Date;
-                    toDate = to.Value.Date.AddDays(1).AddTicks(-1); // include entire 'to' day
-                    q = q.Where(h => h.NgayLap >= fromDate && h.NgayLap <= toDate);
-                }
-                if (status != null) q = q.Where(h => h.TrangThaiGiaoHang == status.Value);
+        var q = _ctx.HoaDons.AsQueryable();
+        // apply date filter only when both from and to are provided
+        if (from != null && to != null)
+        {
+            fromDate = from.Value.Date;
+            toDate = to.Value.Date.AddDays(1).AddTicks(-1); // include entire 'to' day
+            q = q.Where(h => h.NgayLap >= fromDate && h.NgayLap <= toDate);
+        }
+        if (status != null) q = q.Where(h => h.TrangThaiGiaoHang == status.Value);
 
         // filter by invoice type: 'HD' (direct) and 'HDOL' (online)
         if (!string.IsNullOrEmpty(loai))
@@ -94,10 +97,10 @@ namespace BE_QLTiemThuoc.Controllers
 
         // chi tiết hoá đơn
         // GET: api/HoaDonChiTiet/{maHd}
-        [HttpGet("ChiTiet/{maHd}")]
+   [HttpGet("ChiTiet/{maHd}")]
         public async Task<IActionResult> GetChiTiet(string maHd)
         {
-            var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
+          var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
                 if (string.IsNullOrWhiteSpace(maHd)) throw new ArgumentException("maHd is required");
 
@@ -175,26 +178,9 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // // GET: api/HoaDon/nhanvien/{maNV}
-        // [HttpGet("nhanvien/{maNV}")]
-        // public async Task<ActionResult<IEnumerable<HoaDon>>> GetHoaDonByNhanVien(string maNV)
-        // {
-        //     try
-        //     {
-        //         var hoaDons = await _ctx.HoaDons
-        //             .Where(h => h.MaNV == maNV)
-        //             .OrderByDescending(h => h.NgayLap)
-        //             .ToListAsync();
-        //         return Ok(hoaDons);
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return BadRequest(new { message = ex.Message });
-        //     }
-        // }
-// GET: api/HoaDon/nhanvien/{maNV}
-      // GET: api/HoaDon/nhanvien/{maNV}
+        // GET: api/HoaDon/nhanvien/{maNV}
         [HttpGet("nhanvien/{maNV}")]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff
         public async Task<ActionResult<IEnumerable<object>>> GetHoaDonByNhanVien(string maNV)
         {
             try
@@ -369,7 +355,8 @@ namespace BE_QLTiemThuoc.Controllers
         //tạo hoá đơn trực tiếp
         // POST: api/HoaDon/Create
         [HttpPost("Create")]
-        public async Task<IActionResult> Create([FromBody] HoaDonCreateDto dto)
+  [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff mới được tạo hoá đơn trực tiếp
+    public async Task<IActionResult> Create([FromBody] HoaDonCreateDto dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
@@ -550,16 +537,10 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
         // tạo hoá đơn online
-          // POST: api/HoaDon/CreateOnline
-        // Similar to Create but for online orders:
-        // - MaHD starts with 'HDOL'
-        // - MaNV is null
-        // - TrangThaiGiaoHang = 0
-        // - When saving chi tiết, MaLD is always null
         [HttpPost("CreateOnline")]
         public async Task<IActionResult> CreateOnline([FromBody] HoaDonCreateOLDto dto)
         {
-            var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
+      var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
                 if (dto == null) throw new ArgumentNullException(nameof(dto));
                 if (dto.Items == null || dto.Items.Count == 0) throw new ArgumentException("Items are required");
@@ -638,7 +619,7 @@ namespace BE_QLTiemThuoc.Controllers
                         hd.TongTien = tong;
                     }
 
-                    // persist changes (updated TonKho + ChiTietHoaDon rows)
+                    // persist changes (updated TonKho + ChiTietHoaDons rows)
                     await _ctx.SaveChangesAsync();
                     await tx.CommitAsync();
 
@@ -699,9 +680,8 @@ namespace BE_QLTiemThuoc.Controllers
         
         // NOTE: UpdateItems endpoint removed per user request — ConfirmOnline will directly allocate lots like direct Create.
         //gửi hoá đơn cho khách hàng qua email
-        // POST: api/HoaDon/SendToCustomer/{maHd}
-        // Body: pass only invoice id (maHd) as route parameter
-        [HttpPost("SendToCustomer/{maHd}")]
+  [HttpPost("SendToCustomer/{maHd}")]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff
         public async Task<IActionResult> SendToCustomer(string maHd)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
@@ -1109,8 +1089,9 @@ namespace BE_QLTiemThuoc.Controllers
         // Body: { MaHD, MaNV, Items: [{ MaThuoc, DonVi, SoLuong, DonGia, MaLD, HanSuDung }] }
         // This confirms an online order: assigns lots, decrements stock, saves requested HanSuDung and MaLD,
         // and sets TrangThaiGiaoHang = 1 (Đã xác nhận).
-         [HttpPost("ConfirmOnline")]        
-         public async Task<IActionResult> ConfirmOnline([FromBody] ConfirmOnlineDto dto)
+        [HttpPost("ConfirmOnline")]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff mới được xác nhận đơn
+        public async Task<IActionResult> ConfirmOnline([FromBody] ConfirmOnlineDto dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
@@ -1176,8 +1157,8 @@ namespace BE_QLTiemThuoc.Controllers
                     // remove placeholders — we'll create allocated rows below
                     if (placeholders.Any()) _ctx.Set<ChiTietHoaDon>().RemoveRange(placeholders);
 
-                    foreach (var item in itemsToProcess)
-                    {
+                   foreach (var item in itemsToProcess)
+                     {
                         if (string.IsNullOrWhiteSpace(item.MaThuoc)) throw new ArgumentException("Each item must provide 'MaThuoc'.");
                         if (item.SoLuong <= 0) throw new ArgumentException($"Invalid 'SoLuong' for MaThuoc '{item.MaThuoc}'.");
                         if (item.HanSuDung == null) throw new ArgumentException($"Hạn sử dụng (HanSuDung) phải được cung cấp cho MaThuoc '{item.MaThuoc}'.");
@@ -1186,291 +1167,172 @@ namespace BE_QLTiemThuoc.Controllers
                         var requestedHsd = item.HanSuDung.Value;
 
                         // Prepare candidate lots (with row locking) ordered by nearest HSD
-                        List<Model.Kho.TonKho> candidateLots;
-                        if (!string.IsNullOrEmpty(donVi))
-                        {
-                            // Include expired lots as candidates (still FIFO by HSD)
-                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND MaLoaiDonViTinh = {1} AND SoLuongCon > 0 ORDER BY HanSuDung";
-                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, item.MaThuoc, donVi).AsTracking().ToListAsync();
-                        }
-                        else
-                        {
-                            // Include expired lots as candidates (still FIFO by HSD)
-                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND SoLuongCon > 0 ORDER BY HanSuDung";
-                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, item.MaThuoc).AsTracking().ToListAsync();
-                        }
+       List<Model.Kho.TonKho> candidateLots;
+              if (!string.IsNullOrEmpty(donVi))
+        {
+        // Include expired lots as candidates (still FIFO by HSD)
+        var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND MaLoaiDonViTinh = {1} AND SoLuongCon > 0 AND HanSuDung >= {2} ORDER BY HanSuDung";
+    candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, item.MaThuoc, donVi, requestedHsd).AsTracking().ToListAsync();
+ }
+               else
+    {
+       // Include expired lots as candidates (still FIFO by HSD)
+      var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND SoLuongCon > 0 AND HanSuDung >= {1} ORDER BY HanSuDung";
+             candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, item.MaThuoc, requestedHsd).AsTracking().ToListAsync();
+        }
 
-                        var totalAvailable = candidateLots.Sum(l => l.SoLuongCon);
-                        if (totalAvailable < item.SoLuong)
-                        {
-                            throw new InvalidOperationException($"Hàng thuốc {item.MaThuoc} trong kho không đủ theo hạn yêu cầu. Yêu cầu {item.SoLuong}, có {totalAvailable}.");
-                        }
+    var totalAvailable = candidateLots.Sum(l => l.SoLuongCon);
+         if (totalAvailable < item.SoLuong)
+     {
+         throw new InvalidOperationException($"Hàng thuốc {item.MaThuoc} trong kho không đủ theo hạn yêu cầu. Yêu cầu {item.SoLuong}, có {totalAvailable}.");
+        }
 
-                        int remaining = item.SoLuong;
-                        foreach (var tk in candidateLots)
-                        {
-                            if (remaining <= 0) break;
-                            var take = Math.Min(remaining, tk.SoLuongCon);
-                            if (take <= 0) continue;
+int remaining = item.SoLuong;
+          // consume lots in FIFO by nearest expiry: fully deplete current lot before moving to next
+     foreach (var tk in candidateLots)
+             {
+    if (remaining <= 0) break;
+        var take = Math.Min(remaining, tk.SoLuongCon);
+            if (take <= 0) continue;
 
-                            tk.SoLuongCon -= take;
+     tk.SoLuongCon -= take;
 
-                            var cthd = new ChiTietHoaDon
-                            {
-                                MaCTHD = GenMaCtHd(),
-                                MaHD = dto.MaHD,
-                                MaLo = tk.MaLo,
-                                SoLuong = take,
-                                DonGia = item.DonGia,
-                                ThanhTien = item.DonGia * take,
-                                MaLD = string.IsNullOrWhiteSpace(item.MaLD) ? null : item.MaLD,
-                                MaLoaiDonVi = string.IsNullOrWhiteSpace(item.DonVi) ? null : item.DonVi.Trim(),
-                                MaThuoc = tk.MaThuoc,
-                                HanSuDung = requestedHsd,
-                                TrangThaiXuLy = true
-                            };
-                            await _ctx.Set<ChiTietHoaDon>().AddAsync(cthd);
+  var cthd = new ChiTietHoaDon
+            {
+        MaCTHD = GenMaCtHd(),
+       MaHD = dto.MaHD,
+  MaLo = tk.MaLo,
+      SoLuong = take,
+  DonGia = item.DonGia,
+           ThanhTien = item.DonGia * take,
+     MaLD = string.IsNullOrWhiteSpace(item.MaLD) ? null : item.MaLD.Trim(),
+   MaLoaiDonVi = donVi,
+        MaThuoc = tk.MaThuoc,
+          HanSuDung = requestedHsd,
+      TrangThaiXuLy = true
+       };
+   await _ctx.Set<ChiTietHoaDon>().AddAsync(cthd);
 
-                            remaining -= take;
-                        }
-                    }
+          remaining -= take;
+      }
+       }
 
-                    // recompute total for the invoice
-                    await _ctx.SaveChangesAsync();
-                    hd.TongTien = await _ctx.ChiTietHoaDons.Where(ct => ct.MaHD == hd.MaHD).SumAsync(ct => ct.ThanhTien);
+           if (dto.TongTien != null)
+         {
+    hd.TongTien = dto.TongTien.Value;
+  }
+   else
+        {
+  hd.TongTien = await _ctx.ChiTietHoaDons.Where(ct => ct.MaHD == dto.MaHD).SumAsync(ct => ct.ThanhTien);
+    }
 
-                    await _ctx.SaveChangesAsync();
-                    await tx.CommitAsync();
+           await _ctx.SaveChangesAsync();
+   await tx.CommitAsync();
 
-                    var created = await _ctx.HoaDons
-                        .Where(h => h.MaHD == hd.MaHD)
-                        .Select(h => new
-                        {
-                            h.MaHD,
-                            h.NgayLap,
-                            h.MaKH,
-                            h.MaNV,
-                            h.TongTien,
-                            h.GhiChu,
-                            h.TrangThaiGiaoHang,
-                            h.PhuongThucTT,
-                            h.TrangThai,
-                            h.TienThanhToan,
-                            h.OrderCode
-                        })
-                        .FirstOrDefaultAsync();
-
-                    var details = await _ctx.ChiTietHoaDons
-                        .Where(ct => ct.MaHD == hd.MaHD)
-                        .Select(ct => new
-                        {
-                            ct.MaCTHD,
-                            ct.MaHD,
-                            ct.MaLo,
-                            ct.SoLuong,
-                            ct.DonGia,
-                            ct.ThanhTien,
-                            ct.HanSuDung,
-                            ct.MaLD,
-                            ct.MaLoaiDonVi
-                        })
-                        .ToListAsync();
-
-                    return (object)new { Invoice = created, Items = details };
-                }
-                catch
+     var details = await _ctx.ChiTietHoaDons
+ .Where(ct => ct.MaHD == hd.MaHD)
+             .Select(ct => new
                 {
-                    await tx.RollbackAsync();
-                    throw;
-                }
-            });
+   ct.MaCTHD,
+           ct.MaHD,
+             ct.MaLo,
+          ct.SoLuong,
+  ct.DonGia,
+       ct.ThanhTien,
+ ct.HanSuDung,
+      ct.MaLD,
+          ct.MaLoaiDonVi
+    })
+ .ToListAsync();
+
+             return (object)new { Invoice = new { hd.MaHD, hd.NgayLap, hd.MaKH, hd.MaNV, hd.TongTien, hd.GhiChu, hd.TrangThaiGiaoHang }, Items = details };
+       }
+    catch
+    {
+        await tx.RollbackAsync();
+        throw;
+    }
+});
 
             return Ok(response);
         }
-        //  cập nhật chi tiết hoá đơn
-        // PUT: api/HoaDon/UpdateDetails
-        // Upsert HanSuDung and MaLD on ChiTietHoaDon rows for a given invoice (PUT allows insert/update semantics).
-        [HttpPut("UpdateDetails")]
-        public async Task<IActionResult> UpdateDetails([FromBody] UpdateHoaDonDetailsDto dto)
+        // UPDATE: api/HoaDon/UpdateItems/{maHd}
+     [HttpPut("UpdateItems/{maHd}")]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff mới được cập nhật hoá đơn
+        public async Task<IActionResult> UpdateItems(string maHd, [FromBody] List<UpdateChiTietHoaDonItemDto> items)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
-                if (dto == null) throw new ArgumentNullException(nameof(dto));
-                if (string.IsNullOrWhiteSpace(dto.MaHD)) throw new ArgumentException("MaHD is required.");
-                if (dto.Items == null) dto.Items = new List<UpdateChiTietHoaDonItemDto>();
-
-                // Validate invoice exists
-                var hd = await _ctx.HoaDons.FirstOrDefaultAsync(h => h.MaHD == dto.MaHD);
-                if (hd == null) throw new KeyNotFoundException($"Hoá đơn '{dto.MaHD}' không tồn tại.");
+                if (string.IsNullOrWhiteSpace(maHd)) throw new ArgumentException("MaHD is required.");
+                if (items == null || items.Count == 0) throw new ArgumentException("Items are required.");
 
                 await using var tx = await _ctx.Database.BeginTransactionAsync();
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(dto.MaKH)) hd.MaKH = dto.MaKH.Trim();
-                    if (!string.IsNullOrWhiteSpace(dto.MaNV)) hd.MaNV = dto.MaNV.Trim();
-                    if (!string.IsNullOrWhiteSpace(dto.GhiChu)) hd.GhiChu = dto.GhiChu.Trim();
+                    var hd = await _ctx.HoaDons.FirstOrDefaultAsync(h => h.MaHD == maHd);
+                    if (hd == null) throw new KeyNotFoundException($"Hoá đơn '{maHd}' không tồn tại.");
 
-                    var existingDetails = await _ctx.ChiTietHoaDons.Where(ct => ct.MaHD == dto.MaHD).ToListAsync();
+                    // so sánh và cập nhật các trường hợp cần thiết
+         foreach (var item in items)
+         {
+            var existing = await _ctx.ChiTietHoaDons.FirstOrDefaultAsync(ct => ct.MaHD == maHd && ct.MaCTHD == item.MaCTHD);
+            if (existing != null)
+            {
+                // chỉ cập nhật các trường hợp cần thiết để tránh ghi đè dữ liệu không mong muốn
+                bool isUpdated = false;
+                if (item.MaLD != existing.MaLD)
+                {
+                    existing.MaLD = item.MaLD;
+                    isUpdated = true;
+                }
+                if (item.DonVi != existing.MaLoaiDonVi)
+                {
+                    existing.MaLoaiDonVi = item.DonVi;
+                    isUpdated = true;
+                }
+                if (item.HanSuDung.HasValue && item.HanSuDung.Value != existing.HanSuDung)
+                {
+                    existing.HanSuDung = item.HanSuDung.Value;
+                    isUpdated = true;
+                }
+                if (item.DonGia.HasValue && item.DonGia.Value != existing.DonGia)
+                {
+                    existing.DonGia = item.DonGia.Value;
+                    existing.ThanhTien = existing.DonGia * existing.SoLuong;
+                    isUpdated = true;
+                }
+                if (item.SoLuong.HasValue && item.SoLuong.Value != existing.SoLuong)
+                {
+                    var oldQuantity = existing.SoLuong;
+                    var newQuantity = item.SoLuong.Value;
+                    existing.SoLuong = newQuantity;
+                    existing.ThanhTien = existing.DonGia * existing.SoLuong;
 
-                    var incomingIds = dto.Items.Where(i => !string.IsNullOrWhiteSpace(i.MaCTHD)).Select(i => i.MaCTHD).ToHashSet();
-
-                    var toRemove = existingDetails.Where(e => string.IsNullOrWhiteSpace(e.MaCTHD) ? false : !incomingIds.Contains(e.MaCTHD)).ToList();
-                    foreach (var rem in toRemove)
+                    // điều chỉnh số lượng tồn kho tương ứng
+                    var tonKho = await _ctx.TonKhos.FirstOrDefaultAsync(t => t.MaLo == existing.MaLo);
+                    if (tonKho != null)
                     {
-                        if (!string.IsNullOrWhiteSpace(rem.MaLo))
-                        {
-                            var tk = await _ctx.TonKhos.FirstOrDefaultAsync(t => t.MaLo == rem.MaLo);
-                            if (tk != null)
-                            {
-                                tk.SoLuongCon += rem.SoLuong;
-                                _ctx.TonKhos.Update(tk);
-                            }
-                        }
-                        _ctx.Set<ChiTietHoaDon>().Remove(rem);
+                        tonKho.SoLuongCon += (oldQuantity - newQuantity);
+                        _ctx.TonKhos.Update(tonKho);
                     }
+                    isUpdated = true;
+                }
 
-                    string GenMaCtHd() => "CTHD" + DateTime.Now.ToString("yyyyMMddHHmmss") + new Random().Next(10, 99).ToString();
-
-                    decimal computedTotal = 0m;
-
-                    foreach (var itm in dto.Items)
-                    {
-                        if (!string.IsNullOrWhiteSpace(itm.MaCTHD))
-                        {
-                            var existing = existingDetails.FirstOrDefault(e => e.MaCTHD == itm.MaCTHD);
-                            if (existing == null) throw new KeyNotFoundException($"Chi tiết '{itm.MaCTHD}' không tồn tại trên hoá đơn.");
-
-                            existing.HanSuDung = itm.HanSuDung ?? existing.HanSuDung;
-                            existing.MaLD = string.IsNullOrWhiteSpace(itm.MaLD) ? existing.MaLD : itm.MaLD.Trim();
-
-                            if (itm.SoLuong != null || itm.DonGia != null)
-                            {
-                                var newQty = itm.SoLuong ?? existing.SoLuong;
-                                var newPrice = itm.DonGia ?? existing.DonGia;
-                                var delta = newQty - existing.SoLuong;
-
-                                if (delta != 0 && !string.IsNullOrWhiteSpace(existing.MaLo))
-                                {
-                                    var tk = await _ctx.TonKhos.FirstOrDefaultAsync(t => t.MaLo == existing.MaLo);
-                                    if (tk == null) throw new KeyNotFoundException($"Lot '{existing.MaLo}' không tồn tại khi điều chỉnh số lượng.");
-
-                                    if (delta > 0)
-                                    {
-                                        if (tk.SoLuongCon < delta) throw new InvalidOperationException($"Kho lô {tk.MaLo} không đủ để tăng thêm {delta} đơn vị.");
-                                        tk.SoLuongCon -= delta;
-                                    }
-                                    else
-                                    {
-                                        tk.SoLuongCon += (-delta);
-                                    }
-                                    _ctx.TonKhos.Update(tk);
-                                }
-
-                                existing.SoLuong = newQty;
-                                existing.DonGia = newPrice;
-                                existing.ThanhTien = existing.DonGia * existing.SoLuong;
-                            }
-
-                            computedTotal += existing.ThanhTien;
-                        }
-                        else
-                        {
-                            // New insertion: must provide MaThuoc, SoLuong, DonGia
-                            if (string.IsNullOrWhiteSpace(itm.MaThuoc)) throw new ArgumentException("MaThuoc is required for new invoice detail items.");
-                            if (itm.SoLuong == null || itm.SoLuong <= 0) throw new ArgumentException($"SoLuong must be provided and > 0 for MaThuoc '{itm.MaThuoc}'.");
-                            if (itm.DonGia == null || itm.DonGia < 0) throw new ArgumentException($"DonGia must be provided for MaThuoc '{itm.MaThuoc}'.");
-
-                            var maThuoc = itm.MaThuoc.Trim();
-                            var donVi = string.IsNullOrWhiteSpace(itm.DonVi) ? null : itm.DonVi.Trim();
-                            var requestedHsd = itm.HanSuDung;
-
-                            // Allocate lots from TonKho (FIFO by HanSuDung) with row locks
-                            List<Model.Kho.TonKho> candidateLots;
-                            if (!string.IsNullOrEmpty(donVi))
-                            {
-                                var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND MaLoaiDonViTinh = {1} AND SoLuongCon > 0" + (requestedHsd.HasValue ? " AND HanSuDung >= {2} ORDER BY HanSuDung" : " ORDER BY HanSuDung");
-                                if (requestedHsd.HasValue)
-                                    candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, donVi, requestedHsd.Value).AsTracking().ToListAsync();
-                                else
-                                    candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, donVi).AsTracking().ToListAsync();
-                            }
-                            else
-                            {
-                                var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND SoLuongCon > 0" + (requestedHsd.HasValue ? " AND HanSuDung >= {1} ORDER BY HanSuDung" : " ORDER BY HanSuDung");
-                                if (requestedHsd.HasValue)
-                                    candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, requestedHsd.Value).AsTracking().ToListAsync();
-                                else
-                                    candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc).AsTracking().ToListAsync();
-                            }
-
-                            var totalAvailable = candidateLots.Sum(l => l.SoLuongCon);
-                            if (totalAvailable < itm.SoLuong.Value)
-                            {
-                                throw new InvalidOperationException($"Hàng thuốc {maThuoc} trong kho không đủ. Yêu cầu {itm.SoLuong}, có {totalAvailable}.");
-                            }
-
-                            int remaining = itm.SoLuong.Value;
-                            // consume lots in FIFO by nearest expiry: fully deplete current lot before moving to next
-                            foreach (var tk in candidateLots)
-                            {
-                                if (remaining <= 0) break;
-                                var take = Math.Min(remaining, tk.SoLuongCon);
-                                if (take <= 0) continue;
-
-                                tk.SoLuongCon -= take;
-
-                                var cthd = new ChiTietHoaDon
-                                {
-                                    MaCTHD = GenMaCtHd(),
-                                    MaHD = dto.MaHD,
-                                    MaLo = tk.MaLo,
-                                    SoLuong = take,
-                                    DonGia = itm.DonGia.Value,
-                                    ThanhTien = itm.DonGia.Value * take,
-                                    MaLD = string.IsNullOrWhiteSpace(itm.MaLD) ? null : itm.MaLD.Trim(),
-                                    MaLoaiDonVi = donVi,
-                                    MaThuoc = tk.MaThuoc,
-                                    HanSuDung = requestedHsd,
-                                    TrangThaiXuLy = true
-                                };
-                                await _ctx.Set<ChiTietHoaDon>().AddAsync(cthd);
-                                _ctx.TonKhos.Update(tk);
-
-                                computedTotal += cthd.ThanhTien;
-                                remaining -= take;
-                            }
-                        }
-                    }
-
-                    if (dto.TongTien != null)
-                    {
-                        hd.TongTien = dto.TongTien.Value;
-                    }
-                    else
-                    {
-                        hd.TongTien = await _ctx.ChiTietHoaDons.Where(ct => ct.MaHD == dto.MaHD).SumAsync(ct => ct.ThanhTien);
-                    }
+                if (isUpdated)
+                {
+                    _ctx.ChiTietHoaDons.Update(existing);
+                }
+            }
+            else
+            {
+                throw new KeyNotFoundException($"Chi tiết hoá đơn với MaCTHD '{item.MaCTHD}' không tồn tại.");
+            }
+         }
 
                     await _ctx.SaveChangesAsync();
                     await tx.CommitAsync();
 
-                    var details = await _ctx.ChiTietHoaDons
-                        .Where(ct => ct.MaHD == dto.MaHD)
-                        .Select(ct => new
-                        {
-                            ct.MaCTHD,
-                            ct.MaHD,
-                            ct.MaLo,
-                            ct.SoLuong,
-                            ct.DonGia,
-                            ct.ThanhTien,
-                            ct.HanSuDung,
-                            ct.MaLD,
-                            ct.MaLoaiDonVi,
-                            ct.TrangThaiXuLy
-                        }).ToListAsync();
-
-                    return (object)new { Invoice = new { hd.MaHD, hd.NgayLap, hd.MaKH, hd.MaNV, hd.TongTien, hd.GhiChu, hd.TrangThaiGiaoHang }, Items = details };
+                    return new { MaHD = hd.MaHD, TongTien = hd.TongTien };
                 }
                 catch
                 {
@@ -1482,12 +1344,11 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // PATCH: api/HoaDon/UpdateStatus
-        // Body: { MaHD, TrangThaiGiaoHang }
-        // Update the invoice delivery/status field `TrangThaiGiaoHang`.
-        [HttpPatch("UpdateStatus")]
-        public async Task<IActionResult> UpdateStatus([FromBody] UpdateHoaDonStatusDto dto)
-        {
+     // PATCH: api/HoaDon/UpdateStatus
+    [HttpPatch("UpdateStatus")]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff
+    public async Task<IActionResult> UpdateStatus([FromBody] UpdateHoaDonStatusDto dto)
+   {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
             {
                 if (dto == null) throw new ArgumentNullException(nameof(dto));
@@ -1549,9 +1410,9 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // DELETE: api/HoaDon/Delete/{maHd}
-        // Remove an invoice and its details, and restore stock for any allocated lots.
+     // DELETE: api/HoaDon/Delete/{maHd}
         [HttpDelete("Delete/{maHd}")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá hoá đơn
         public async Task<IActionResult> Delete(string maHd)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>

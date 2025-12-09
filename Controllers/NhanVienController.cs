@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.Services;
 using BE_QLTiemThuoc.Dto;
@@ -7,6 +8,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AdminOrStaff")]// 🔐 Chỉ Admin hoặc Staff quản lý nhân viên
     public class NhanVienController : ControllerBase
     {
         private readonly NhanVienService _service;
@@ -98,6 +100,7 @@ namespace BE_QLTiemThuoc.Controllers
         /// Endpoint mới: Tạo nhân viên cùng với tài khoản đăng nhập
         /// </summary>
         [HttpPost("create-with-account")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được tạo nhân viên
         public async Task<ActionResult<NhanVienCreateResponseDto>> CreateWithAccount([FromBody] NhanVienCreateDto createDto)
         {
             try
@@ -126,6 +129,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được cập nhật nhân viên
         public async Task<IActionResult> Update(string id, [FromBody] NhanVien nhanVien)
         {
             try
@@ -143,6 +147,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá nhân viên
         public async Task<IActionResult> Delete(string id)
         {
             try
@@ -160,6 +165,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpPost("{id}/disable-account")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được vô hiệu hoá
         public async Task<IActionResult> DisableAccount(string id)
         {
             try
@@ -177,6 +183,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpPost("{id}/enable-account")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được mở lại
         public async Task<IActionResult> EnableAccount(string id)
         {
             try
