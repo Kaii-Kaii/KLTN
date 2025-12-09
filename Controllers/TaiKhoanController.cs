@@ -820,7 +820,6 @@ namespace BE_QLTiemThuoc.Controllers
 
             if (user.ISEMAILCONFIRMED == 0)
                 return BadRequest("Tài khoản chưa xác thực email.");
-
             // Check admin status based on ChucVu from NhanVien table
             bool isAdmin = false;
             int? chucVu = null;
@@ -887,7 +886,7 @@ namespace BE_QLTiemThuoc.Controllers
                 MaTK = user.MaTK,
                 TenDangNhap = user.TenDangNhap,
                 Email = user.EMAIL,
-                MaKH = user.MaKH,
+                MaKH = user.MaKH,        // 🔥 FE CẦN CÁI NÀY
                 MaNV = user.MaNV,
                 ChucVu = chucVu ?? 0,
                 VaiTro = vaiTro,
