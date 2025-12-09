@@ -180,6 +180,7 @@ public async Task<IActionResult> GetThuocById(string maThuoc)
         // GET: api/Thuoc/ByCode/{code}
         // Search thuốc by Code - returns list of MaThuoc, TenThuoc, Code
         [HttpGet("ByCode/{code}")]
+        [Authorize(Policy = "AdminOrStaff")] 
         public async Task<IActionResult> GetThuocByCode(string code)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -194,6 +195,7 @@ public async Task<IActionResult> GetThuocById(string maThuoc)
         // GET: api/Thuoc/SearchCode/{code}
         // Find exact match by Code
         [HttpGet("SearchCode/{code}")]
+        [Authorize(Policy = "AdminOrStaff")] 
         public async Task<IActionResult> GetThuocByCodeExact(string code)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
