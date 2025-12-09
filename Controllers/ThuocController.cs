@@ -90,7 +90,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/ListThuocTonKho
       [HttpGet("ListThuocTonKho")]
-      [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff xem tồn kho
+       [AllowAnonymous]  // 🔐 Chỉ Admin hoặc Staff xem tồn kho
         public async Task<IActionResult> GetListThuocTonKho()
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
