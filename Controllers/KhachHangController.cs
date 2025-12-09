@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.Services;
+using BE_QLTiemThuoc.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -9,17 +11,40 @@ namespace BE_QLTiemThuoc.Controllers
     public class KhachHangController : ControllerBase
     {
         private readonly KhachHangService _service;
+        private readonly AppDbContext _context;
 
-        public KhachHangController(KhachHangService service)
+        public KhachHangController(KhachHangService service, AppDbContext context)
         {
             _service = service;
+            _context = context;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<KhachHang>>> GetAll()
         {
-            var list = await _service.GetAllAsync();
-            return Ok(list);
+            // ✅ JOIN KhachHang with TaiKhoan to get EMAIL via MaKH
+            var data = await _context.KhachHangs
+                .GroupJoin(
+                    _context.TaiKhoans,
+                    kh => kh.MAKH,
+                    tk => tk.MaKH,
+                    (kh, tks) => new {
+                        kh.MAKH,
+                        kh.HoTen,
+                        kh.NgaySinh,
+                        kh.GioiTinh,
+                        kh.DiaChi,
+                        kh.DienThoai,
+                        Email = tks.FirstOrDefault() != null ? tks.FirstOrDefault().EMAIL ?? "" : ""
+                    }
+                )
+                .ToListAsync();
+            
+            return Ok(new {
+                status = 1,
+                message = "Lấy danh sách khách hàng thành công",
+                data = data
+            });
         }
 
         // GET: api/KhachHang/{maKhachHang}
