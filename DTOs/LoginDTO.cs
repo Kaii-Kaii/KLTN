@@ -19,6 +19,7 @@ namespace BE_QLTiemThuoc.DTOs
         public string? Email { get; set; }
         public string? MaKH { get; set; }
         public string? MaNV { get; set; }
+        public int? ChucVu { get; set; }
         public string? VaiTro { get; set; }
         public bool HasCustomerInfo { get; set; }
         public bool IsAdmin { get; set; }

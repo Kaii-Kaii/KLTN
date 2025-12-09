@@ -4,6 +4,7 @@ using BE_QLTiemThuoc.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using BE_QLTiemThuoc.Data;
+using BE_QLTiemThuoc.Model.Thuoc;
 namespace BE_QLTiemThuoc.Services
 {
     public class PhieuHuyService
@@ -275,7 +276,7 @@ namespace BE_QLTiemThuoc.Services
                 d["MaNV"] = p.MaNV ?? string.Empty;
                 d["NhanVienName"] = (p.MaNV != null && nvNames.ContainsKey(p.MaNV)) ? (nvNames[p.MaNV] ?? string.Empty) : string.Empty;
                 d["GhiChu"] = p.GhiChu ?? string.Empty;
-                // Totals not stored in DB schema provided; omit
+                d["TongTien"]=p.TongTien;
                 outList.Add(item);
             }
 
@@ -300,14 +301,14 @@ namespace BE_QLTiemThuoc.Services
                 )
                 .SelectMany(x => x.tks.DefaultIfEmpty(), (x, tk) => new { x.ct, tk })
                 .GroupJoin(
-                    _context.Set<BE_QLTiemThuoc.Model.Thuoc.Thuoc>().AsNoTracking(),
+                    _context.Set<Thuoc>().AsNoTracking(),
                     x => x.tk != null ? x.tk.MaThuoc : null,
                     th => th.MaThuoc,
                     (x, ths) => new { x.ct, x.tk, ths }
                 )
                 .SelectMany(x => x.ths.DefaultIfEmpty(), (x, th) => new { x.ct, x.tk, th })
                 .GroupJoin(
-                    _context.Set<BE_QLTiemThuoc.Model.Thuoc.LoaiDonVi>().AsNoTracking(),
+                    _context.Set<LoaiDonVi>().AsNoTracking(),
                     x => x.tk != null ? x.tk.MaLoaiDonViTinh : null,
                     ldv => ldv.MaLoaiDonVi,
                     (x, ldvs) => new { x.ct, x.tk, x.th, ldvs }
