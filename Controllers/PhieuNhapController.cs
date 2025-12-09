@@ -1,11 +1,13 @@
 ﻿using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Dto;
 
 namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff quản lý phiếu nhập
     public class PhieuNhapController : ControllerBase
     {
         private readonly PhieuNhapService _service;
@@ -92,7 +94,7 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-    [HttpGet("GetChiTietPhieuNhapByMaPN")]
+        [HttpGet("GetChiTietPhieuNhapByMaPN")]
         public async Task<IActionResult> GetChiTietPhieuNhapByMaPN(string maPN)
         {
             if (string.IsNullOrEmpty(maPN))
@@ -164,6 +166,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // DELETE: api/PhieuNhap/DeletePhieuNhap/{maPN}
         [HttpDelete("DeletePhieuNhap/{*maPN}")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá
         public async Task<IActionResult> DeletePhieuNhap(string maPN)
         {
             // Decode lại maPN nếu có ký tự encode

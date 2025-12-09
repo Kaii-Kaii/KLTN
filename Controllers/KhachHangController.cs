@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.Services;
 using BE_QLTiemThuoc.Data;
@@ -20,6 +21,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff xem danh sách KH
         public async Task<ActionResult<IEnumerable<KhachHang>>> GetAll()
         {
             // ✅ JOIN KhachHang with TaiKhoan to get EMAIL via MaKH
@@ -49,6 +51,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/KhachHang/{maKhachHang}
         [HttpGet("{maKhachHang}")]
+        [Authorize]  // 🔐 User phải đăng nhập
         public async Task<ActionResult<KhachHang>> GetById(string maKhachHang)
         {
             if (string.IsNullOrWhiteSpace(maKhachHang)) return BadRequest("maKhachHang is required");
@@ -61,6 +64,7 @@ namespace BE_QLTiemThuoc.Controllers
 
 
         [HttpPost]
+        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff tạo KH mới
         public async Task<ActionResult<KhachHang>> CreateKhachHang(KhachHang dto)
         {
             var created = await _service.CreateAsync(dto);
@@ -69,6 +73,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // PUT: api/KhachHang/{maKhachHang}
         [HttpPut("{maKhachHang}")]
+        [Authorize]  // 🔐 User phải đăng nhập để cập nhật
         public async Task<IActionResult> UpdateKhachHang(string maKhachHang, KhachHang dto)
         {
             if (string.IsNullOrWhiteSpace(maKhachHang)) return BadRequest("maKhachHang is required");

@@ -1,11 +1,13 @@
 using BE_QLTiemThuoc.Model.Thuoc;
 using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BE_QLTiemThuoc.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff qu?n lý lo?i ??n v?
     public class LoaiDonViController : ControllerBase
     {
         private readonly LoaiDonViService _service;
@@ -45,6 +47,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Policy = "AdminOnly")]  // ?? Ch? Admin m?i ???c xoá
         public async Task<IActionResult> Delete(string id)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>

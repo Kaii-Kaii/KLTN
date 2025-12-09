@@ -1,11 +1,13 @@
 using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Dto;
 
 namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff qu?n lý phi?u hu?
     public class PhieuHuyController : ControllerBase
     {
         private readonly PhieuHuyService _service;

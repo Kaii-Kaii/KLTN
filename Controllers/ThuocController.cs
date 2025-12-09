@@ -1,6 +1,7 @@
 ﻿using BE_QLTiemThuoc.Dto;
 using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace BE_QLTiemThuoc.Controllers
@@ -13,7 +14,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         public ThuocController(ThuocService service)
         {
-            _service = service;
+   _service = service;
         }
 
         // Helper: extract filename from a provided URL or path. Returns null if input empty.
@@ -52,8 +53,9 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/Thuoc/TopLoaiThuoc
         [HttpGet("TopLoaiThuoc")]
-        public async Task<IActionResult> GetTopLoaiThuoc()
-        {
+    [AllowAnonymous]  // 🔓 Public - khách có thể xem
+  public async Task<IActionResult> GetTopLoaiThuoc()
+   {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(() => _service.GetTopLoaiThuocAsync());
 
             return Ok(response);
@@ -61,6 +63,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/Thuoc
         [HttpGet]
+  [AllowAnonymous]  // 🔓 Public - khách có thể xem danh sách thuốc
         public async Task<IActionResult> GetThuoc()
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -73,6 +76,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/Thuoc/LoaiDonVi
         [HttpGet("LoaiDonVi")]
+        [AllowAnonymous]  // 🔓 Public
         public async Task<IActionResult> GetLoaiDonVi()
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -85,7 +89,8 @@ namespace BE_QLTiemThuoc.Controllers
 
 
         // GET: api/ListThuocTonKho
-        [HttpGet("ListThuocTonKho")]
+      [HttpGet("ListThuocTonKho")]
+      [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff xem tồn kho
         public async Task<IActionResult> GetListThuocTonKho()
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -96,7 +101,8 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
         // GET: api/Thuoc/ByLoaiTonKho/{maLoaiThuoc}
-        [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
+     [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
+     [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff xem tồn kho
         public async Task<IActionResult> GetThuocByLoaiTonKho(string maLoaiThuoc)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -108,7 +114,8 @@ namespace BE_QLTiemThuoc.Controllers
         }
         // GET: api/Thuoc/ByLoai/{maLoaiThuoc}
         [HttpGet("ByLoai/{maLoaiThuoc}")]
-        public async Task<IActionResult> GetThuocByLoai(string maLoaiThuoc)
+ [AllowAnonymous]  // 🔓 Public
+ public async Task<IActionResult> GetThuocByLoai(string maLoaiThuoc)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
             {
@@ -120,7 +127,8 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/Thuoc/{maThuoc}
         [HttpGet("{maThuoc}")]
-        public async Task<IActionResult> GetThuocById(string maThuoc)
+        [AllowAnonymous]  // 🔓 Public - khách có thể xem chi tiết thuốc
+public async Task<IActionResult> GetThuocById(string maThuoc)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
             {
@@ -132,24 +140,27 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // GET: api/Thuoc/{maThuoc}/GiaThuocs
+      // GET: api/Thuoc/{maThuoc}/GiaThuocs
         [HttpGet("{maThuoc}/GiaThuocs")]
-        public async Task<IActionResult> GetGiaThuocs(string maThuoc)
-        {
+        [AllowAnonymous]  // 🔓 Public
+   public async Task<IActionResult> GetGiaThuocs(string maThuoc)
+     {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () => await _service.GetGiaThuocsByMaThuocAsync(maThuoc));
             return Ok(response);
         }
 
-        // POST: api/Thuoc
+   // POST: api/Thuoc
         [HttpPost]
+   [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff tạo thuốc mới
         public async Task<IActionResult> PostThuoc([FromForm] ThuocDto thuocDto)
-        {
+     {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () => await _service.CreateThuocAsync(thuocDto, Request));
             return Ok(response);
         }
 
         // PUT: api/Thuoc/{id}
         [HttpPut("{id}")]
+     [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff cập nhật
         public async Task<IActionResult> PutThuoc(string id, [FromForm] ThuocDto thuocDto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () => await _service.UpdateThuocAsync(id, thuocDto, Request));
@@ -159,8 +170,9 @@ namespace BE_QLTiemThuoc.Controllers
 
         // DELETE: api/Thuoc/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteThuoc(string id)
-        {
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá thuốc
+     public async Task<IActionResult> DeleteThuoc(string id)
+     {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () => await _service.DeleteThuocAsync(id));
             return Ok(response);
         }
