@@ -177,6 +177,37 @@ public async Task<IActionResult> GetThuocById(string maThuoc)
             return Ok(response);
         }
 
+        // GET: api/Thuoc/ByCode/{code}
+        // Search thuốc by Code - returns list of MaThuoc, TenThuoc, Code
+        [HttpGet("ByCode/{code}")]
+        [Authorize(Policy = "AdminOrStaff")] 
+        public async Task<IActionResult> GetThuocByCode(string code)
+        {
+            var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
+            {
+                var thuocs = await _service.GetThuocByCodeAsync(code);
+                return thuocs;
+            });
+
+            return Ok(response);
+        }
+
+        // GET: api/Thuoc/SearchCode/{code}
+        // Find exact match by Code
+        [HttpGet("SearchCode/{code}")]
+        [Authorize(Policy = "AdminOrStaff")] 
+        public async Task<IActionResult> GetThuocByCodeExact(string code)
+        {
+            var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
+            {
+                var thuoc = await _service.GetThuocByCodeExactAsync(code);
+                if (thuoc == null) throw new Exception("Không tìm thấy thuốc với mã này.");
+                return thuoc;
+            });
+
+            return Ok(response);
+        }
+
         
     }
 }

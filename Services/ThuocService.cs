@@ -695,5 +695,39 @@ namespace BE_QLTiemThuoc.Services
                 throw;
             }
         }
+
+        // GET: api/Thuoc/ByCode/{code}
+        // Search thuốc by Code field - returns MaThuoc and TenThuoc
+        public Task<object> GetThuocByCodeAsync(string code)
+        {
+            var ctx = _repo.Context;
+            return ctx.Thuoc
+                .Where(t => t.Code != null && t.Code.Contains(code))
+                .Select(t => new
+                {
+                    t.MaThuoc,
+                    t.TenThuoc,
+                    t.Code
+                })
+                .ToListAsync()
+                .ContinueWith(t => (object)t.Result);
+        }
+
+        // GET: api/Thuoc/SearchCode/{code}
+        // Lightweight search - find single match for exact or partial code
+        public Task<object?> GetThuocByCodeExactAsync(string code)
+        {
+            var ctx = _repo.Context;
+            return ctx.Thuoc
+                .Where(t => t.Code == code)
+                .Select(t => new
+                {
+                    t.MaThuoc,
+                    t.TenThuoc,
+                    t.Code
+                })
+                .FirstOrDefaultAsync()
+                .ContinueWith(t => (object?)t.Result);
+        }
     }
 }
