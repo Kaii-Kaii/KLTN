@@ -46,8 +46,6 @@ namespace BE_QLTiemThuoc.Data
         public DbSet<CuocTroChuyen> CuocTroChuyens { get; set; }
         public DbSet<TinNhan> TinNhans { get; set; }
 
-        // Ma (Mã Code)
-        public DbSet<Ma> Mas { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -130,8 +128,6 @@ namespace BE_QLTiemThuoc.Data
             modelBuilder.Entity<TinNhan>().Property(t => t.ThoiGian).HasColumnType("datetime2");
             modelBuilder.Entity<TinNhan>().HasIndex(t => new { t.MaCuocTroChuyen, t.ThoiGian });
 
-            // Ma (Mã Code)
-            modelBuilder.Entity<Ma>().ToTable("ma");
         }
     }
 

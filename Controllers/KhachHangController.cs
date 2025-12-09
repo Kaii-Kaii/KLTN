@@ -22,7 +22,6 @@ namespace BE_QLTiemThuoc.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<KhachHang>>> GetAll()
         {
-            // ✅ JOIN KhachHang with TaiKhoan to get EMAIL via MaKH
             var data = await _context.KhachHangs
                 .GroupJoin(
                     _context.TaiKhoans,

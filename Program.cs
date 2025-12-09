@@ -78,8 +78,6 @@ builder.Services.AddScoped<DanhGiaThuocRepository>();
 builder.Services.AddScoped<DanhGiaThuocService>();
 builder.Services.AddScoped<BinhLuanRepository>();
 builder.Services.AddScoped<BinhLuanService>();
-builder.Services.AddScoped<MaRepository>();
-builder.Services.AddScoped<MaService>();
 builder.Services.AddScoped<ChatRepository>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<IThongKeService, ThongKeService>();
