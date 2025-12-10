@@ -24,7 +24,6 @@ namespace BE_QLTiemThuoc.Controllers
         [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff xem danh sách KH
         public async Task<ActionResult<IEnumerable<KhachHang>>> GetAll()
         {
-            // ✅ JOIN KhachHang with TaiKhoan to get EMAIL via MaKH
             var data = await _context.KhachHangs
                 .GroupJoin(
                     _context.TaiKhoans,
