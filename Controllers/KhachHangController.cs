@@ -63,7 +63,7 @@ namespace BE_QLTiemThuoc.Controllers
 
 
         [HttpPost]
-        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff tạo KH mới
+        [Authorize]  // 🔐 Chỉ Admin hoặc Staff tạo KH mới
         public async Task<ActionResult<KhachHang>> CreateKhachHang(KhachHang dto)
         {
             var created = await _service.CreateAsync(dto);

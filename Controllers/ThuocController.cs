@@ -101,8 +101,8 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
         // GET: api/Thuoc/ByLoaiTonKho/{maLoaiThuoc}
-        [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
-        [Authorize(Policy = "AdminOrStaff")]  //  Chỉ Admin hoặc Staff xem tồn kho
+     [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetThuocByLoaiTonKho(string maLoaiThuoc)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
