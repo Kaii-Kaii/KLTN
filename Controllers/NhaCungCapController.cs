@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using BE_QLTiemThuoc.Model.Thuoc;
 using BE_QLTiemThuoc.Services;
 
@@ -6,6 +7,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff quản lý NCC
     public class NhaCungCapController : ControllerBase
     {
         private readonly NhaCungCapService _service;
@@ -67,6 +69,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // DELETE: api/NhaCungCap/{id}
         [HttpDelete("{id}")]
+        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá
         public async Task<IActionResult> Delete(string id)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>

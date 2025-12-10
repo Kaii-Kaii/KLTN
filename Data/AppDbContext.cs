@@ -47,6 +47,7 @@ namespace BE_QLTiemThuoc.Data
         public DbSet<TinNhan> TinNhans { get; set; }
 
 
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -126,6 +127,7 @@ namespace BE_QLTiemThuoc.Data
 
             modelBuilder.Entity<TinNhan>().Property(t => t.ThoiGian).HasColumnType("datetime2");
             modelBuilder.Entity<TinNhan>().HasIndex(t => new { t.MaCuocTroChuyen, t.ThoiGian });
+
         }
     }
 

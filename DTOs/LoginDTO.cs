@@ -40,6 +40,10 @@ namespace BE_QLTiemThuoc.DTOs
         public string? VaiTro { get; set; }
         public bool HasCustomerInfo { get; set; }
         public bool IsAdmin { get; set; }
+
         public string? Token { get; set; }
+
+        
+
     }
 }

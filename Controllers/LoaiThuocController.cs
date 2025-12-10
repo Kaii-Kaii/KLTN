@@ -1,6 +1,7 @@
 using BE_QLTiemThuoc.Model.Thuoc;
 using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -20,6 +21,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]  // ?? Public - khách có th? xem
         public async Task<IActionResult> GetAll()
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -38,6 +40,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff
         public async Task<IActionResult> Create([FromBody] LoaiThuoc dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -52,6 +55,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff
         public async Task<IActionResult> Update(string id, [FromBody] LoaiThuoc dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -65,6 +69,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Policy = "AdminOnly")]  // ?? Ch? Admin m?i ???c xoá
         public async Task<IActionResult> Delete(string id)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
@@ -79,6 +84,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // GET: api/LoaiThuoc/{id}/Details
         [HttpGet("{id}/Details")]
+        [AllowAnonymous]  // ?? Public
         public async Task<IActionResult> Details(string id)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>

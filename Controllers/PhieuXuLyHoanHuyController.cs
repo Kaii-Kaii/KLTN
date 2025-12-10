@@ -1,5 +1,6 @@
 using BE_QLTiemThuoc.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using System;
 using System.Threading.Tasks;
 using BE_QLTiemThuoc.Model.Kho;
@@ -9,6 +10,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff qu?n lý phi?u x? lý hoàn hu?
     public class PhieuXuLyHoanHuyController : ControllerBase
     {
         private readonly PhieuXuLyHoanHuyService _service;
@@ -111,6 +113,7 @@ namespace BE_QLTiemThuoc.Controllers
         public class ApproveDto { public string? MaNV_Duyet { get; set; } }
 
         [HttpPost("Approve/{maPXH}")]
+        [Authorize(Policy = "AdminOnly")]  // ?? Ch? Admin m?i ???c duy?t
         public async Task<IActionResult> Approve(string maPXH, [FromBody] ApproveDto dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
