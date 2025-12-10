@@ -63,7 +63,6 @@ namespace BE_QLTiemThuoc.Controllers
 
 
         [HttpPost]
-        [Authorize]  // 🔐 Chỉ Admin hoặc Staff tạo KH mới
         public async Task<ActionResult<KhachHang>> CreateKhachHang(KhachHang dto)
         {
             var created = await _service.CreateAsync(dto);
@@ -72,7 +71,6 @@ namespace BE_QLTiemThuoc.Controllers
 
         // PUT: api/KhachHang/{maKhachHang}
         [HttpPut("{maKhachHang}")]
-        [Authorize]  // 🔐 User phải đăng nhập để cập nhật
         public async Task<IActionResult> UpdateKhachHang(string maKhachHang, KhachHang dto)
         {
             if (string.IsNullOrWhiteSpace(maKhachHang)) return BadRequest("maKhachHang is required");
