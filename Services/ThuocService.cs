@@ -95,6 +95,7 @@ namespace BE_QLTiemThuoc.Services
                 .Select(t => new
                 {
                     t.MaThuoc,
+                    t.Code,
                     t.MaLoaiThuoc,
                     t.TenThuoc,
                     t.ThanhPhan, 
@@ -244,7 +245,9 @@ namespace BE_QLTiemThuoc.Services
                 .Select(t => new
                 {
                     t.MaThuoc,
+                    t.Code,
                     t.MaLoaiThuoc,
+                    TenLoaiThuoc = ctx.LoaiThuoc.Where(lt => lt.MaLoaiThuoc == t.MaLoaiThuoc).Select(lt => lt.TenLoaiThuoc).FirstOrDefault(),
                     t.TenThuoc,
                     t.ThanhPhan,
                     t.MoTa,
@@ -271,7 +274,6 @@ namespace BE_QLTiemThuoc.Services
                 .FirstOrDefaultAsync()
                 .ContinueWith(t => (object?)t.Result);
         }
-
         // GET: all GiaThuoc rows for a given MaThuoc with computed SoLuongCon and TenLoaiDonVi
         // Also returns the nearest expiration date (HanSuDung) among available lots for this MaThuoc
         public async Task<object> GetGiaThuocsByMaThuocAsync(string maThuoc)
@@ -424,7 +426,8 @@ namespace BE_QLTiemThuoc.Services
                 CachDung = thuocDto?.CachDung ?? string.Empty,
                 LuuY = thuocDto?.LuuY ?? string.Empty,
                 MaNCC = thuocDto?.MaNCC ?? string.Empty,
-                UrlAnh = imageUrl ?? string.Empty
+                UrlAnh = imageUrl ?? string.Empty,
+                Code = thuocDto?.Code ?? string.Empty
             };
 
             var ctx = _repo.Context;
@@ -564,6 +567,7 @@ namespace BE_QLTiemThuoc.Services
             entity.CachDung = thuocDto.CachDung ?? entity.CachDung;
             entity.LuuY = thuocDto.LuuY ?? entity.LuuY;
             entity.MaNCC = thuocDto.MaNCC ?? entity.MaNCC;
+            entity.Code = thuocDto.Code ?? entity.Code;
             // Pricing lives in GIATHUOC now; update prices via separate endpoints for GIATHUOC
 
             try
@@ -731,3 +735,4 @@ namespace BE_QLTiemThuoc.Services
         }
     }
 }
+
