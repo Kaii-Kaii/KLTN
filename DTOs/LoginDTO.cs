@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace BE_QLTiemThuoc.DTOs
 {
@@ -9,6 +10,22 @@ namespace BE_QLTiemThuoc.DTOs
 
         [Required(ErrorMessage = "Mật khẩu không được để trống")]
         public string MatKhau { get; set; }
+    }
+
+    public class GoogleLoginRequest
+    {
+        [Required(ErrorMessage = "ID Token không được để trống")]
+        [JsonPropertyName("idToken")]
+        public string IdToken { get; set; }
+        
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+        
+        [JsonPropertyName("displayName")]
+        public string? DisplayName { get; set; }
+        
+        [JsonPropertyName("photoURL")]
+        public string? PhotoURL { get; set; }
     }
 
     public class LoginResponse
@@ -23,6 +40,10 @@ namespace BE_QLTiemThuoc.DTOs
         public string? VaiTro { get; set; }
         public bool HasCustomerInfo { get; set; }
         public bool IsAdmin { get; set; }
-        public string? Token { get; set; }  // 🔥 JWT Token
+
+        public string? Token { get; set; }
+
+        
+
     }
 }

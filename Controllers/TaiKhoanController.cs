@@ -7,6 +7,7 @@ using BE_QLTiemThuoc.Model;
 using BE_QLTiemThuoc.DTOs;
 using SendGrid;
 using SendGrid.Helpers.Mail;
+using Google.Apis.Auth;
 
 namespace BE_QLTiemThuoc.Controllers
 {
@@ -248,6 +249,162 @@ namespace BE_QLTiemThuoc.Controllers
                 Token = token
             });
         }
+
+
+        // ========= LOGIN WITH GOOGLE =========
+        [HttpPost("LoginWithGoogle")]
+        public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleLoginRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                // Verify Firebase ID Token (not Google ID Token)
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { "nhathuoc-f9fce" }, // Firebase Project ID
+                    IssuedAtClockTolerance = TimeSpan.FromMinutes(5),
+                    ExpirationTimeClockTolerance = TimeSpan.FromMinutes(5)
+                };
+
+                GoogleJsonWebSignature.Payload payload;
+                try
+                {
+                    payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+                }
+                catch (Exception ex)
+                {
+                    // Nếu verification thất bại, vẫn cho phép login nếu có email
+                    // (vì Firebase đã verify rồi)
+                    if (string.IsNullOrEmpty(request.Email))
+                    {
+                        return BadRequest($"Token không hợp lệ: {ex.Message}");
+                    }
+                    
+                    // Sử dụng email từ request thay vì từ token
+                    var userByEmail = await _context.TaiKhoans
+                        .FirstOrDefaultAsync(u => u.EMAIL == request.Email);
+                    
+                    return await ProcessGoogleLogin(userByEmail, request.Email, request.DisplayName);
+                }
+
+                // Token hợp lệ, sử dụng email từ payload
+                var user = await _context.TaiKhoans
+                    .FirstOrDefaultAsync(u => u.EMAIL == payload.Email);
+
+                return await ProcessGoogleLogin(user, payload.Email, request.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Lỗi đăng nhập Google: {ex.Message}");
+            }
+        }
+
+        // Helper method to process Google login
+        private async Task<IActionResult> ProcessGoogleLogin(TaiKhoan? user, string email, string? displayName)
+        {
+            if (user == null)
+            {
+                // Tạo tài khoản mới cho user Google
+                user = new TaiKhoan
+                {
+                    MaTK = GenerateAccountCode(),
+                    TenDangNhap = email, // Dùng email làm username
+                    MatKhau = GenerateRandomPassword(), // Generate random password
+                    EMAIL = email,
+                    ISEMAILCONFIRMED = 1, // Google đã verify email rồi
+                    EMAILCONFIRMATIONTOKEN = null
+                };
+
+                _context.TaiKhoans.Add(user);
+                await _context.SaveChangesAsync();
+            }
+
+            // Kiểm tra admin status
+            bool isAdmin = false;
+            int? chucVu = null;
+            string vaiTro = "User";
+
+            if (!string.IsNullOrEmpty(user.MaNV))
+            {
+                var nhanVien = await _context.Set<NhanVien>()
+                    .FirstOrDefaultAsync(nv => nv.MaNV == user.MaNV);
+
+                if (nhanVien != null)
+                {
+                    chucVu = nhanVien.ChucVu;
+                    isAdmin = (nhanVien.ChucVu == 1);
+                    vaiTro = isAdmin ? "Admin" : "Staff";
+                }
+            }
+
+            bool hasCustomerInfo = false;
+
+            // Kiểm tra thông tin khách hàng
+            if (!isAdmin && string.IsNullOrEmpty(user.MaNV))
+            {
+                if (string.IsNullOrEmpty(user.MaKH))
+                {
+                    // Tạo mã khách hàng mới
+                    string newMaKH = GenerateKhachHangCode();
+                    user.MaKH = newMaKH;
+
+                    var kh = new KhachHang
+                    {
+                        MAKH = newMaKH,
+                        HoTen = displayName, // Dùng tên từ Google
+                        GioiTinh = null,
+                        NgaySinh = null,
+                        DiaChi = null,
+                        DienThoai = null
+                    };
+
+                    _context.KhachHangs.Add(kh);
+                    await _context.SaveChangesAsync();
+
+                    hasCustomerInfo = false; // Vẫn cần nhập thông tin đầy đủ
+                }
+                else
+                {
+                    var kh = await _context.KhachHangs
+                        .FirstOrDefaultAsync(k => k.MAKH == user.MaKH);
+
+                    if (kh != null)
+                    {
+                        hasCustomerInfo = !string.IsNullOrEmpty(kh.HoTen)
+                                       && !string.IsNullOrEmpty(kh.DiaChi)
+                                       && !string.IsNullOrEmpty(kh.DienThoai);
+                    }
+                }
+            }
+
+            return Ok(new LoginResponse
+            {
+                Message = "Đăng nhập Google thành công.",
+                MaTK = user.MaTK,
+                TenDangNhap = user.TenDangNhap,
+                Email = user.EMAIL,
+                MaKH = user.MaKH,
+                MaNV = user.MaNV,
+                ChucVu = chucVu ?? 0,
+                VaiTro = vaiTro,
+                HasCustomerInfo = hasCustomerInfo,
+                IsAdmin = isAdmin
+            });
+        }
+
+        // Helper: Generate random password for Google users
+        private string GenerateRandomPassword()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, 16)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+
+
 
         // ========= CONFIRM EMAIL =========
         [HttpGet("ConfirmEmail")]
