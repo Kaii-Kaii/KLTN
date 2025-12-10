@@ -14,6 +14,7 @@ namespace BE_QLTiemThuoc.Dto
         public string? LuuY { get; set; }
         public string? UrlAnh { get; set; }
         public string MaNCC { get; set; }
+        public string? Code { get; set; }
         public IFormFile? FileAnh { get; set; }
          public List<GiaThuocDto>? GiaThuocs { get; set; }
     }

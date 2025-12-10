@@ -40,6 +40,7 @@ namespace BE_QLTiemThuoc.Services
                     {
                         tk.MaLo,
                         tk.MaThuoc,
+                        Code = t.Code,
                         TenThuoc = t.TenThuoc,
                         ThanhPhan = t.ThanhPhan,
                         MaLoaiThuoc = t.MaLoaiThuoc,
@@ -77,6 +78,7 @@ namespace BE_QLTiemThuoc.Services
                     {
                         tk.MaLo,
                         tk.MaThuoc,
+                        Code = t.Code,
                         TenThuoc = t.TenThuoc,
                         MaLoaiThuoc = t.MaLoaiThuoc,
                         TenLoaiThuoc = _context.Set<LoaiThuoc>().Where(l => l.MaLoaiThuoc == t.MaLoaiThuoc).Select(l => l.TenLoaiThuoc).FirstOrDefault(),
@@ -99,11 +101,12 @@ namespace BE_QLTiemThuoc.Services
             var q = from tk in _context.TonKhos
                     join t in _context.Thuoc on tk.MaThuoc equals t.MaThuoc
                     where tk.TrangThaiSeal == false && tk.SoLuongCon > 0
-                    group tk by new { tk.MaThuoc, t.TenThuoc, tk.MaLoaiDonViTinh } into g
+                    group tk by new { tk.MaThuoc, t.TenThuoc, t.Code, tk.MaLoaiDonViTinh } into g
                     orderby g.Key.TenThuoc
                     select new
                     {
                         MaThuoc = g.Key.MaThuoc,
+                        Code = g.Key.Code,
                         TenThuoc = g.Key.TenThuoc,
                         DonViTinh = g.Key.MaLoaiDonViTinh,
                         TenLoaiDonVi = _context.Set<LoaiDonVi>().Where(d => d.MaLoaiDonVi == g.Key.MaLoaiDonViTinh).Select(d => d.TenLoaiDonVi).FirstOrDefault(),
@@ -163,6 +166,7 @@ namespace BE_QLTiemThuoc.Services
                     {
                         tk.MaLo,
                         tk.MaThuoc,
+                        Code = t.Code,
                         TenThuoc = t.TenThuoc,
                         DonViGoc = tk.MaLoaiDonViTinh,
                         TenLoaiDonViGoc = _context.Set<LoaiDonVi>().Where(d => d.MaLoaiDonVi == tk.MaLoaiDonViTinh).Select(d => d.TenLoaiDonVi).FirstOrDefault(),
@@ -190,6 +194,7 @@ namespace BE_QLTiemThuoc.Services
                     {
                         tk.MaLo,
                         tk.MaThuoc,
+                        Code = t.Code,
                         TenThuoc = t.TenThuoc,
                         DonViGoc = tk.MaLoaiDonViTinh,
                         TenLoaiDonViGoc = _context.Set<LoaiDonVi>().Where(d => d.MaLoaiDonVi == tk.MaLoaiDonViTinh).Select(d => d.TenLoaiDonVi).FirstOrDefault(),
