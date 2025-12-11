@@ -101,7 +101,7 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
         // GET: api/Thuoc/ByLoaiTonKho/{maLoaiThuoc}
-     [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
+        [HttpGet("ByLoaiTonKho/{maLoaiThuoc}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetThuocByLoaiTonKho(string maLoaiThuoc)
         {
