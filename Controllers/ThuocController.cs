@@ -206,6 +206,19 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
+        // GET: api/Thuoc/TopSelling
+        // Lấy danh sách thuốc bán chạy nhất
+        [HttpGet("TopSelling")]
+        [AllowAnonymous]  // Public - khách có thể xem
+        public async Task<IActionResult> GetTopSellingThuoc([FromQuery] int top = 10)
+        {
+            var response = await ApiResponseHelper.ExecuteSafetyAsync(async () =>
+            {
+                return await _service.GetTopSellingThuocAsync(top);
+            });
+            return Ok(response);
+        }
+
         
     }
 }

@@ -32,6 +32,9 @@ namespace BE_QLTiemThuoc.Controllers
  [HttpPost]
  public async Task<IActionResult> Create([FromBody] BinhLuanCreateDto dto) => Ok(await ApiResponseHelper.ExecuteSafetyAsync(()=> _service.CreateAsync(dto)));
 
+ [HttpPut("{maBL}")]
+ public async Task<IActionResult> Update(string maBL, [FromBody] BinhLuanUpdateDto dto) => Ok(await ApiResponseHelper.ExecuteSafetyAsync(()=> _service.UpdateAsync(maBL, dto)));
+
  [HttpDelete("{maBL}")]
  public async Task<IActionResult> Delete(string maBL) => Ok(await ApiResponseHelper.ExecuteSafetyAsync(()=> _service.DeleteAsync(maBL)));
  }

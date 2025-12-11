@@ -8,6 +8,7 @@ namespace BE_QLTiemThuoc.Repositories
  {
  private readonly AppDbContext _ctx;
  public BinhLuanRepository(AppDbContext ctx){ _ctx = ctx; }
+ public AppDbContext Context => _ctx;
 
  public Task<BinhLuan?> GetByIdAsync(string id) => _ctx.BinhLuans.FirstOrDefaultAsync(b=>b.MaBL==id);
  public async Task AddAsync(BinhLuan e){ await _ctx.BinhLuans.AddAsync(e); }

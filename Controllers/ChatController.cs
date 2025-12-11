@@ -7,7 +7,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]  // ?? Yêu c?u ??ng nh?p cho t?t c? API chat
+    [Authorize]  
     public class ChatController : ControllerBase
     {
     private readonly ChatService _service;

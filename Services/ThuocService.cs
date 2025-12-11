@@ -754,5 +754,88 @@ namespace BE_QLTiemThuoc.Services
                 .FirstOrDefaultAsync()
                 .ContinueWith(t => (object?)t.Result);
         }
+
+        // GET: Danh sách thuốc bán chạy nhất (top selling)
+        public async Task<object> GetTopSellingThuocAsync(int top = 10)
+        {
+            var ctx = _repo.Context;
+
+            // Lấy tổng số lượng bán từ ChiTietHoaDon cho các hoá đơn đã hoàn thành (TrangThaiGiaoHang = 3)
+            var salesData = await (from ct in ctx.ChiTietHoaDons
+                                   join hd in ctx.HoaDons on ct.MaHD equals hd.MaHD
+                                   where hd.TrangThaiGiaoHang == 3 // Chỉ tính hoá đơn đã nhận
+                                   join tk in ctx.TonKhos on ct.MaLo equals tk.MaLo into tkGroup
+                                   from tk in tkGroup.DefaultIfEmpty()
+                                   let maThuoc = ct.MaThuoc ?? (tk != null ? tk.MaThuoc : null)
+                                   where maThuoc != null
+                                   group ct by maThuoc into g
+                                   select new
+                                   {
+                                       MaThuoc = g.Key,
+                                       TongSoLuongBan = g.Sum(x => x.SoLuong)
+                                   })
+                                   .OrderByDescending(x => x.TongSoLuongBan)
+                                   .Take(top)
+                                   .ToListAsync();
+
+            // Join với bảng Thuốc để lấy thông tin chi tiết
+            var maThuocList = salesData.Select(s => s.MaThuoc).ToList();
+            var thuocList = await ctx.Thuoc
+                .Where(t => maThuocList.Contains(t.MaThuoc))
+                .Select(t => new
+                {
+                    t.MaThuoc,
+                    t.MaLoaiThuoc,
+                    t.TenThuoc,
+                    t.ThanhPhan,
+                    t.MoTa,
+                    t.UrlAnh,
+                    tongSoLuongCon = ctx.TonKhos.Where(tk => tk.MaThuoc == t.MaThuoc && tk.SoLuongCon > 0 && !tk.TrangThaiSeal).Sum(tk => (int?)tk.SoLuongCon) ?? 0,
+                    soSaoTrungBinh = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Average(dg => (double?)dg.SoSao) ?? 0,
+                    soLuongDanhGia = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Count(),
+                    GiaThuocs = ctx.GiaThuocs
+                                .Where(x => x.MaThuoc == t.MaThuoc && x.TrangThai)
+                                .Select(x => new
+                                {
+                                    x.MaGiaThuoc,
+                                    x.MaLoaiDonVi,
+                                    TenLoaiDonVi = ctx.Set<LoaiDonVi>().Where(d => d.MaLoaiDonVi == x.MaLoaiDonVi).Select(d => d.TenLoaiDonVi).FirstOrDefault(),
+                                    x.SoLuong,
+                                    x.DonGia,
+                                    x.TrangThai,
+                                    SoLuongCon = ctx.TonKhos.Where(tk => tk.MaThuoc == t.MaThuoc && tk.MaLoaiDonViTinh == x.MaLoaiDonVi && tk.SoLuongCon > 0).Sum(tk => (int?)tk.SoLuongCon) ?? 0
+                                })
+                                .ToList()
+                })
+                .ToListAsync();
+
+            // Kết hợp dữ liệu bán hàng với thông tin thuốc
+            var result = salesData
+                .Join(thuocList,
+                      s => s.MaThuoc,
+                      t => t.MaThuoc,
+                      (s, t) => new
+                      {
+                          t.MaThuoc,
+                          t.MaLoaiThuoc,
+                          t.TenThuoc,
+                          t.ThanhPhan,
+                          t.MoTa,
+                          t.UrlAnh,
+                          t.tongSoLuongCon,
+                          t.soSaoTrungBinh,
+                          t.soLuongDanhGia,
+                          tongSoLuongBan = s.TongSoLuongBan,
+                          t.GiaThuocs
+                      })
+                .OrderByDescending(x => x.tongSoLuongBan)
+                .ToList();
+
+            return result;
+        }
     }
 }
