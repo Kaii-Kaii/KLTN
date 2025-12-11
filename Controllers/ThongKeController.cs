@@ -7,7 +7,7 @@ namespace BE_QLTiemThuoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Policy = "AdminOrStaff")]  // ?? Ch? Admin ho?c Staff xem th?ng kê
+    [Authorize(Policy = "AdminOrStaff")]  
     public class ThongKeController : ControllerBase
     {
         private readonly IThongKeService _thongKeService;

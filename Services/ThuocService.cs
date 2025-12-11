@@ -132,6 +132,13 @@ namespace BE_QLTiemThuoc.Services
                           moTa = t.MoTa,
                           urlAnh = t.UrlAnh,
                           tongSoLuongCon = g.TongSoLuongCon,
+                          // Thêm thông tin đánh giá
+                          soSaoTrungBinh = ctx.DanhGiaThuocs
+                                              .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                              .Average(dg => (double?)dg.SoSao) ?? 0,
+                          soLuongDanhGia = ctx.DanhGiaThuocs
+                                              .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                              .Count(),
                           GiaThuocs = ctx.GiaThuocs
                                         .Where(x => x.MaThuoc == t.MaThuoc && x.TrangThai)
                                         .Select(x => new
@@ -217,6 +224,13 @@ namespace BE_QLTiemThuoc.Services
                     t.MoTa,
                     t.UrlAnh,
                     TenNCC = ctx.NhaCungCaps.Where(n => n.MaNCC == t.MaNCC).Select(n => n.TenNCC).FirstOrDefault(),
+                    // Thêm thông tin đánh giá
+                    soSaoTrungBinh = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Average(dg => (double?)dg.SoSao) ?? 0,
+                    soLuongDanhGia = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Count(),
                     GiaThuocs = ctx.GiaThuocs
                                 .Where(x => x.MaThuoc == t.MaThuoc && x.TrangThai
                                              && ctx.TonKhos.Any(tk => tk.MaThuoc == t.MaThuoc && tk.MaLoaiDonViTinh == x.MaLoaiDonVi && tk.SoLuongCon > 0 && !tk.TrangThaiSeal))
@@ -257,6 +271,13 @@ namespace BE_QLTiemThuoc.Services
                     t.UrlAnh,
                     t.MaNCC,
                     TenNCC = ctx.NhaCungCaps.Where(n => n.MaNCC == t.MaNCC).Select(n => n.TenNCC).FirstOrDefault(),
+                    // Thêm thông tin đánh giá
+                    soSaoTrungBinh = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Average(dg => (double?)dg.SoSao) ?? 0,
+                    soLuongDanhGia = ctx.DanhGiaThuocs
+                                        .Where(dg => dg.MaThuoc == t.MaThuoc)
+                                        .Count(),
                     GiaThuocs = ctx.GiaThuocs
                                 .Where(x => x.MaThuoc == t.MaThuoc)
                                 .Select(x => new
@@ -735,4 +756,3 @@ namespace BE_QLTiemThuoc.Services
         }
     }
 }
-
