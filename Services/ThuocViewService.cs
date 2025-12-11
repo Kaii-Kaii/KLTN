@@ -31,7 +31,7 @@ namespace BE_QLTiemThuoc.Services
                   // For status == 1 keep only non-expired lots with SoLuongCon > 0.
                   // When status is not provided, keep previous behavior (exclude expired lots).
                   where tk.TrangThaiSeal == false && (
-                      status == null ? tk.HanSuDung > today
+                       status == null ? true
                       : (status == 1 ? (tk.HanSuDung > today && tk.SoLuongCon > 0)
                       : (/* status == 0 */ tk.SoLuongCon == 0 || tk.HanSuDung <= today))
                   )
@@ -69,7 +69,7 @@ namespace BE_QLTiemThuoc.Services
                   // For status == 1 keep only non-expired lots with SoLuongCon > 0.
                   // When status is not provided, keep previous behavior (exclude expired lots).
                   where tk.TrangThaiSeal == true && (
-                      status == null ? tk.HanSuDung > today
+                      status == null ? true
                       : (status == 1 ? (tk.HanSuDung > today && tk.SoLuongCon > 0)
                       : (/* status == 0 */ tk.SoLuongCon == 0 || tk.HanSuDung <= today))
                   )

@@ -417,13 +417,15 @@ namespace BE_QLTiemThuoc.Controllers
                         var today = DateTime.Today;
                         if (!string.IsNullOrEmpty(donVi))
                         {
-                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND MaLoaiDonViTinh = {1} AND SoLuongCon > 0 AND HanSuDung >= CAST(GETDATE() AS DATE) ORDER BY HanSuDung";
-                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, donVi).AsTracking().ToListAsync();
+                            // Lọc lô còn hạn (>= hôm nay) và có HanSuDung >= HanSuDung yêu cầu
+                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND MaLoaiDonViTinh = {1} AND SoLuongCon > 0 AND HanSuDung >= CAST(GETDATE() AS DATE) AND HanSuDung >= {2} ORDER BY HanSuDung";
+                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, donVi, requestedHsd).AsTracking().ToListAsync();
                         }
                         else
                         {
-                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND SoLuongCon > 0 AND HanSuDung >= CAST(GETDATE() AS DATE) ORDER BY HanSuDung";
-                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc).AsTracking().ToListAsync();
+                            // Lọc lô còn hạn (>= hôm nay) và có HanSuDung >= HanSuDung yêu cầu
+                            var sql = "SELECT * FROM TON_KHO WITH (UPDLOCK, ROWLOCK) WHERE MaThuoc = {0} AND SoLuongCon > 0 AND HanSuDung >= CAST(GETDATE() AS DATE) AND HanSuDung >= {1} ORDER BY HanSuDung";
+                            candidateLots = await _ctx.TonKhos.FromSqlRaw(sql, maThuoc, requestedHsd).AsTracking().ToListAsync();
                         }
 
                         var totalAvailable = candidateLots.Sum(l => l.SoLuongCon);
@@ -1216,7 +1218,7 @@ namespace BE_QLTiemThuoc.Controllers
         }
         // UPDATE: api/HoaDon/UpdateItems/{maHd}
         [HttpPut("UpdateItems/{maHd}")]
-        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff mới được cập nhật hoá đơn
+        [Authorize(Policy = "AdminOrStaff")]  //  Chỉ Admin hoặc Staff mới được cập nhật hoá đơn
         public async Task<IActionResult> UpdateItems(string maHd, [FromBody] List<UpdateChiTietHoaDonItemDto> items)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
@@ -1302,9 +1304,9 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-
+        // PATCH: api/HoaDon/UpdateStatus
         [HttpPatch("UpdateStatus")]
-        [Authorize] 
+        [Authorize(Policy = "AdminOrStaff")]  // Chỉ Admin hoặc Staff
         public async Task<IActionResult> UpdateStatus([FromBody] UpdateHoaDonStatusDto dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
@@ -1360,7 +1362,7 @@ namespace BE_QLTiemThuoc.Controllers
 
         // DELETE: api/HoaDon/Delete/{maHd}
         [HttpDelete("Delete/{maHd}")]
-        [Authorize(Policy = "AdminOnly")]  // 🔐 Chỉ Admin mới được xoá hoá đơn
+        [Authorize(Policy = "AdminOnly")]  //  Chỉ Admin mới được xoá hoá đơn
         public async Task<IActionResult> Delete(string maHd)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
