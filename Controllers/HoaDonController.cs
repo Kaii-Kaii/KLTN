@@ -681,7 +681,7 @@ namespace BE_QLTiemThuoc.Controllers
         // NOTE: UpdateItems endpoint removed per user request — ConfirmOnline will directly allocate lots like direct Create.
         //gửi hoá đơn cho khách hàng qua email
   [HttpPost("SendToCustomer/{maHd}")]
-        [Authorize(Policy = "AdminOrStaff")]  // 🔐 Chỉ Admin hoặc Staff
+        [Authorize]  
         public async Task<IActionResult> SendToCustomer(string maHd)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
