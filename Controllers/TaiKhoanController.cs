@@ -446,7 +446,7 @@ var html = @"
 </body>
 </html>";
 
-return Content(html, "text/html; charset=utf-8");
+return Content(html, "text/html; charset=UTF-8");
 
         }
 
