@@ -1302,9 +1302,9 @@ namespace BE_QLTiemThuoc.Controllers
             return Ok(response);
         }
 
-        // PATCH: api/HoaDon/UpdateStatus
+
         [HttpPatch("UpdateStatus")]
-        [Authorize(Policy = "AdminOrStaff")]  // Chỉ Admin hoặc Staff
+        [Authorize] 
         public async Task<IActionResult> UpdateStatus([FromBody] UpdateHoaDonStatusDto dto)
         {
             var response = await ApiResponseHelper.ExecuteSafetyAsync<object>(async () =>
