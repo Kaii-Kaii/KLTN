@@ -434,7 +434,9 @@ namespace BE_QLTiemThuoc.Controllers
 
             await _context.SaveChangesAsync();
 
-var html = @"
+var loginUrl = "https://nhathuocmedion.io.vn/login";
+
+var html = $@"
 <!DOCTYPE html>
 <html lang='vi'>
 <head>
@@ -442,7 +444,7 @@ var html = @"
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>Xác thực thành công</title>
     <style>
-        body {
+        body {{
             font-family: 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #E0F7FA, #F1FBFF);
             display: flex;
@@ -451,9 +453,9 @@ var html = @"
             height: 100vh;
             margin: 0;
             color: #333;
-        }
+        }}
 
-        .card {
+        .card {{
             background: white;
             padding: 40px 50px;
             border-radius: 18px;
@@ -461,14 +463,14 @@ var html = @"
             text-align: center;
             max-width: 420px;
             animation: fadeIn 0.5s ease;
-        }
+        }}
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(20px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
 
-        .icon {
+        .icon {{
             width: 90px;
             height: 90px;
             border-radius: 50%;
@@ -480,24 +482,24 @@ var html = @"
             color: white;
             font-size: 48px;
             animation: pop 0.4s ease;
-        }
+        }}
 
-        @keyframes pop {
-            0% { transform: scale(0.3); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes pop {{
+            0% {{ transform: scale(0.3); opacity: 0; }}
+            100% {{ transform: scale(1); opacity: 1; }}
+        }}
 
-        h2 {
+        h2 {{
             margin-top: 0;
             color: #0288D1;
-        }
+        }}
 
-        p {
+        p {{
             font-size: 15px;
             margin-bottom: 25px;
-        }
+        }}
 
-        a.button {
+        a.button {{
             display: inline-block;
             padding: 12px 22px;
             background: #0288D1;
@@ -506,23 +508,23 @@ var html = @"
             border-radius: 10px;
             font-weight: bold;
             transition: 0.2s;
-        }
+        }}
 
-        a.button:hover {
+        a.button:hover {{
             background: #0277BD;
-        }
+        }}
 
-        .redirect-msg {
+        .redirect-msg {{
             margin-top: 15px;
             font-size: 13px;
             color: #555;
-        }
+        }}
     </style>
 
     <script>
-        setTimeout(() => {
-            window.location.href = '/login';
-        }, 3000);
+        setTimeout(() => {{
+            window.location.href = '{loginUrl}';
+        }}, 3000);
     </script>
 </head>
 <body>
@@ -532,7 +534,7 @@ var html = @"
         <h2>Xác thực thành công!</h2>
         <p>Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập để tiếp tục sử dụng hệ thống.</p>
 
-        <a class='button' href='/login'>Trở về đăng nhập</a>
+        <a class='button' href='{loginUrl}'>Trở về đăng nhập</a>
 
         <div class='redirect-msg'>
             Sẽ tự động chuyển trong 3 giây...
@@ -542,11 +544,13 @@ var html = @"
 </body>
 </html>
 ";
+
 return new ContentResult {
     Content = html,
     ContentType = "text/html; charset=UTF-8",
     StatusCode = 200
 };
+
 
         }
 
