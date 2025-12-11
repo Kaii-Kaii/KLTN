@@ -434,7 +434,20 @@ namespace BE_QLTiemThuoc.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Content("<h2 style='color:#03A9F4'>Xác thực thành công!</h2>", "text/html");
+var html = @"
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<title>Xác thực</title>
+</head>
+<body>
+<h2 style='color:#03A9F4'>Xác thực thành công!</h2>
+</body>
+</html>";
+
+return Content(html, "text/html; charset=utf-8");
+
         }
 
         // ========= HELPER =========
