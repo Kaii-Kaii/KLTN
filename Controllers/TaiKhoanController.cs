@@ -379,6 +379,17 @@ namespace BE_QLTiemThuoc.Controllers
                 }
             }
 
+            // ========= GENERATE JWT TOKEN =========
+            string token = _jwtService.GenerateToken(
+                user.MaTK,
+                user.TenDangNhap,
+                user.EMAIL,
+                user.MaKH,
+                user.MaNV,
+                vaiTro,
+                chucVu ?? 0
+            );
+
             return Ok(new LoginResponse
             {
                 Message = "Đăng nhập Google thành công.",
@@ -390,7 +401,8 @@ namespace BE_QLTiemThuoc.Controllers
                 ChucVu = chucVu ?? 0,
                 VaiTro = vaiTro,
                 HasCustomerInfo = hasCustomerInfo,
-                IsAdmin = isAdmin
+                IsAdmin = isAdmin,
+                Token = token
             });
         }
 
